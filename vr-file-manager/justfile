@@ -1,0 +1,31 @@
+default:
+    just dev
+
+setup:
+    mkdir -p thumbnails server/data
+    cd server && yarn install
+    cd web && yarn install
+
+dev:
+    ./dev.sh
+
+# Type-check both server and web
+check:
+    cd server && npx tsc --noEmit
+    cd web && npx tsc --noEmit
+
+# Type-check server only
+check-server:
+    cd server && npx tsc --noEmit
+
+# Type-check web only
+check-web:
+    cd web && npx tsc --noEmit
+
+# Build web for production
+build-web:
+    cd web && npx vite build
+
+# Clean generated files (thumbnails, db, node_modules)
+clean:
+    rm -rf thumbnails server/data/*.db server/data/*.db-* server/node_modules web/node_modules web/dist
