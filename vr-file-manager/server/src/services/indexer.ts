@@ -38,20 +38,24 @@ export async function indexFolder(folderPath: string, logger: any): Promise<{ fo
   emit('scan:status', { phase: 'indexing', total: videoPaths.length });
 
   let newVideos = 0;
-  const insertStmt = db.prepare('INSERT OR IGNORE INTO videos (folder_id, filename, path, size_bytes, thumb_hash) VALUES (?, ?, ?, ?, ?)');
+  const insertStmt = db.prepare('INSERT OR IGNORE INTO videos (folder_id, filename, path, size_bytes, thumb_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)');
   const updateHashStmt = db.prepare('UPDATE videos SET size_bytes = COALESCE(size_bytes, ?), thumb_hash = ? WHERE path = ? AND thumb_hash IS NULL');
 
   for (const vp of videoPaths) {
     const filename = path.basename(vp);
     let sizeBytes: number | null = null;
     let thumbHash: string | null = null;
+    let createdAt: string | null = null;
     try {
       const stat = await fs.stat(vp);
       sizeBytes = stat.size;
       thumbHash = computeThumbHash(filename, sizeBytes);
+      // Use birthtime (file creation) if available, fall back to mtime
+      const fileTime = stat.birthtime.getTime() > 0 ? stat.birthtime : stat.mtime;
+      createdAt = fileTime.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
     } catch {}
 
-    const result = insertStmt.run(folder.id, filename, vp, sizeBytes, thumbHash);
+    const result = insertStmt.run(folder.id, filename, vp, sizeBytes, thumbHash, createdAt);
     if (result.changes > 0) {
       newVideos++;
     } else if (thumbHash) {

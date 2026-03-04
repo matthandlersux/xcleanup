@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api, { Folder } from '../api.js';
 
 interface Props {
@@ -7,13 +7,19 @@ interface Props {
   disabled?: boolean;
 }
 
+let autoScannedOnce = false;
+
 export default function FolderPicker({ onScanned, onAutoScanStarted, disabled }: Props) {
   const [path, setPath] = useState('');
   const [folders, setFolders] = useState<Folder[]>([]);
   const [scanning, setScanning] = useState(false);
   const [selectedFolderId, setSelectedFolderId] = useState<string>('');
+  const didInit = useRef(false);
 
   useEffect(() => {
+    if (didInit.current) return;
+    didInit.current = true;
+
     api.getFolders().then(loaded => {
       setFolders(loaded);
       // Auto-select the most recently scanned folder
@@ -22,9 +28,12 @@ export default function FolderPicker({ onScanned, onAutoScanStarted, disabled }:
         setSelectedFolderId(String(first.id));
         setPath(first.path);
         onScanned(first.id);
-        // Fire-and-forget auto-scan
-        if (onAutoScanStarted) onAutoScanStarted(first.id);
-        api.autoScan().catch(() => {});
+        // Fire-and-forget auto-scan — only once per page load
+        if (!autoScannedOnce) {
+          autoScannedOnce = true;
+          if (onAutoScanStarted) onAutoScanStarted(first.id);
+          api.autoScan().catch(() => {});
+        }
       }
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

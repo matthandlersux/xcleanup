@@ -123,6 +123,41 @@ export default function LightboxView({ video: initialVideo, videos, folderPath, 
   };
   const onMouseUp = () => setDragging(false);
 
+  // Touch swipe for mobile navigation
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (modal || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    touchStartRef.current = { x: t.clientX, y: t.clientY, time: Date.now() };
+  };
+
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStartRef.current || modal) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStartRef.current.x;
+    const dy = t.clientY - touchStartRef.current.y;
+    const dt = Date.now() - touchStartRef.current.time;
+    touchStartRef.current = null;
+
+    // Only count as swipe if fast enough and long enough
+    if (dt > 500) return;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+    const minSwipe = 50;
+
+    if (absDx > absDy && absDx > minSwipe) {
+      // Horizontal swipe — navigate videos
+      if (dx < 0) goToVideo(1);
+      else goToVideo(-1);
+    } else if (absDy > absDx && absDy > minSwipe) {
+      // Vertical swipe — navigate thumbnails
+      if (dy < 0) changeThumb(Math.min(thumbCount - 1, thumbIdx + 1));
+      else changeThumb(Math.max(0, thumbIdx - 1));
+    }
+  };
+
   const getCrop = (): 'full' | 'left' | 'top' => {
     if (viewMode === 'split-v') return 'left';
     if (viewMode === 'split-h') return 'top';
@@ -196,9 +231,11 @@ export default function LightboxView({ video: initialVideo, videos, folderPath, 
     <div
       className="lightbox-overlay"
       onClick={e => { if (e.target === e.currentTarget && !modal) onClose(); }}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
     >
-      {/* Toolbar */}
-      <div className="lightbox-toolbar" onClick={e => e.stopPropagation()}>
+      {/* Desktop toolbar */}
+      <div className="lightbox-toolbar lightbox-toolbar--desktop" onClick={e => e.stopPropagation()}>
         <button onClick={() => setMode('normal')} className={`lb-btn ${viewMode === 'normal' ? 'lb-btn-active' : ''}`}>
           Normal
         </button>
@@ -226,6 +263,32 @@ export default function LightboxView({ video: initialVideo, videos, folderPath, 
           {generatingMore ? 'Generating...' : 'More Screenshots'}
         </button>
       </div>
+
+      {/* Mobile toolbar — compact top bar + expandable menu */}
+      <div className="lightbox-toolbar lightbox-toolbar--mobile" onClick={e => e.stopPropagation()}>
+        <button className="lb-btn" onClick={onClose}>Close</button>
+        <div className="mobile-view-btns">
+          <button onClick={() => setMode('normal')} className={`lb-btn ${viewMode === 'normal' ? 'lb-btn-active' : ''}`}>N</button>
+          <button onClick={() => setMode('split-v')} className={`lb-btn ${viewMode === 'split-v' ? 'lb-btn-active' : ''}`}>SBS</button>
+          <button onClick={() => setMode('split-h')} className={`lb-btn ${viewMode === 'split-h' ? 'lb-btn-active' : ''}`}>TB</button>
+        </div>
+        <button className="lb-btn" onClick={() => setShowMobileMenu(m => !m)}>
+          {showMobileMenu ? 'Less' : 'More'}
+        </button>
+      </div>
+      {showMobileMenu && (
+        <div className="mobile-action-menu" onClick={e => e.stopPropagation()}>
+          {viewMode !== 'normal' && (
+            <button className={`lb-btn ${vrMode ? 'lb-btn-active' : ''}`} onClick={() => { setVrMode(v => !v); resetView(); }}>VR Look Around</button>
+          )}
+          <button className="lb-btn" onClick={() => { openModal('rename'); setShowMobileMenu(false); }}>Rename</button>
+          <button className="lb-btn" onClick={() => { openModal('move'); setShowMobileMenu(false); }}>Move</button>
+          <button className="lb-btn lb-btn-danger" onClick={() => { openModal('delete'); setShowMobileMenu(false); }}>Delete</button>
+          <button className="lb-btn" onClick={() => { handleMoreScreenshots(); setShowMobileMenu(false); }} disabled={generatingMore}>
+            {generatingMore ? 'Generating...' : 'More Screenshots'}
+          </button>
+        </div>
+      )}
 
       {/* Video navigation arrows */}
       {videoIndex > 0 && (
@@ -297,9 +360,12 @@ export default function LightboxView({ video: initialVideo, videos, folderPath, 
         {parentFolder && <> &mdash; {parentFolder}</>}
         {video.created_at && <> &mdash; {formatDate(video.created_at)}</>}
         {' '}&mdash; {videoIndex + 1}/{videos.length}
-        {vrMode
-          ? ' \u2014 Drag to look around, scroll to zoom FOV'
-          : ' \u2014 ←/→ videos, ↑/↓ thumbs, scroll zoom'}
+        <span className="lightbox-hint-desktop">
+          {vrMode
+            ? ' \u2014 Drag to look around, scroll to zoom FOV'
+            : ' \u2014 \u2190/\u2192 videos, \u2191/\u2193 thumbs, scroll zoom'}
+        </span>
+        <span className="lightbox-hint-mobile"> &mdash; Swipe to navigate</span>
       </div>
 
       {/* Modal */}

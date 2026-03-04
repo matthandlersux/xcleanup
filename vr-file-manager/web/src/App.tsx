@@ -25,10 +25,14 @@ export default function App() {
   const [lightbox, setLightbox] = useState<{ video: Video; index: number } | null>(null);
   const [scan, setScan] = useState<ScanState>({ phase: 'idle', message: '' });
 
-  // Sort & view
-  const [sortField, setSortField] = useState<SortField>('filename');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  // Sort & view — persist in localStorage
+  const [sortField, setSortField] = useState<SortField>(() => (localStorage.getItem('sortField') as SortField) || 'filename');
+  const [sortOrder, setSortOrder] = useState<SortOrder>(() => (localStorage.getItem('sortOrder') as SortOrder) || 'asc');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => (localStorage.getItem('viewMode') as ViewMode) || 'grid');
+
+  useEffect(() => { localStorage.setItem('sortField', sortField); }, [sortField]);
+  useEffect(() => { localStorage.setItem('sortOrder', sortOrder); }, [sortOrder]);
+  useEffect(() => { localStorage.setItem('viewMode', viewMode); }, [viewMode]);
 
   // Modal state for list-view actions
   const [modalVideo, setModalVideo] = useState<Video | null>(null);
@@ -68,6 +72,9 @@ export default function App() {
   useEffect(() => {
     if (folderId) loadVideos(folderId);
   }, [folderId, loadVideos, sortField, sortOrder]);
+
+  // Scroll to top when page changes
+  useEffect(() => { window.scrollTo(0, 0); }, [page]);
 
   // When folder is selected, remember its path
   const handleFolderScanned = useCallback((fid?: number) => {
@@ -173,10 +180,11 @@ export default function App() {
     loadMoveHistory();
   };
 
-  const toggleSortOrder = () => setSortOrder(o => o === 'asc' ? 'desc' : 'asc');
+  const toggleSortOrder = () => { setSortOrder(o => o === 'asc' ? 'desc' : 'asc'); setPage(1); };
+  const handleSortField = (field: SortField) => { setSortField(field); setPage(1); };
   const handleListSort = (field: SortField) => {
     if (field === sortField) toggleSortOrder();
-    else { setSortField(field); setSortOrder('asc'); }
+    else { setSortField(field); setSortOrder('asc'); setPage(1); }
   };
 
   const sortArrow = (field: SortField) => field === sortField ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : '';
@@ -239,7 +247,7 @@ export default function App() {
             <span className="video-count">{total} videos</span>
             <div className="sort-controls">
               <label>Sort:</label>
-              <select value={sortField} onChange={e => setSortField(e.target.value as SortField)}>
+              <select value={sortField} onChange={e => handleSortField(e.target.value as SortField)}>
                 <option value="filename">Filename</option>
                 <option value="path">Path</option>
                 <option value="size_bytes">Size</option>

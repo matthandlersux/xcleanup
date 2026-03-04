@@ -11,24 +11,20 @@ dev:
 
 # Type-check both server and web
 check:
-    cd server && npx tsc --noEmit
-    cd web && npx tsc --noEmit
+    cd server && yarn tsc --noEmit
+    cd web && yarn tsc --noEmit
 
 # Type-check server only
 check-server:
-    cd server && npx tsc --noEmit
+    cd server && yarn tsc --noEmit
 
 # Type-check web only
 check-web:
-    cd web && npx tsc --noEmit
+    cd web && yarn tsc --noEmit
 
 # Build web for production
 build-web:
-    cd web && npx vite build
-
-# Migrate thumbnails from ID-based to hash-based directories
-migrate-thumbs:
-    cd server && npx tsx src/migrate-thumbs.ts
+    cd web && yarn vite build
 
 # Clean generated files (thumbnails, db, node_modules)
 clean:
