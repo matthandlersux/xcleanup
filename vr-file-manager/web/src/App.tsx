@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import api, { Video, VideoListResponse, SortField, SortOrder } from './api.js';
 import FolderPicker from './components/FolderPicker.js';
 import VideoCard from './components/VideoCard.js';
@@ -39,6 +39,9 @@ export default function App() {
   const [modal, setModal] = useState<Modal>(null);
   const [modalInput, setModalInput] = useState('');
   const [modalLoading, setModalLoading] = useState(false);
+
+  // Search filter (client-side, filters current page)
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Track which videos are currently being probed/thumbnailed
   const [probingIds, setProbingIds] = useState<Set<number>>(new Set());
@@ -189,11 +192,20 @@ export default function App() {
 
   const sortArrow = (field: SortField) => field === sortField ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : '';
 
+  const filteredVideos = useMemo(() => {
+    if (!searchQuery.trim()) return videos;
+    const q = searchQuery.toLowerCase();
+    return videos.filter(v =>
+      v.filename.toLowerCase().includes(q) ||
+      v.path.toLowerCase().includes(q)
+    );
+  }, [videos, searchQuery]);
+
   const totalPages = Math.ceil(total / limit);
 
   // Navigate lightbox to next/prev video
   const handleLightboxNavigate = (videoId: number) => {
-    const v = videos.find(v => v.id === videoId);
+    const v = filteredVideos.find(v => v.id === videoId);
     if (v && v.thumbs.length > 0) {
       const sorted = [...v.thumbs].sort((a, b) => a.index - b.index);
       setLightbox({ video: v, index: sorted[0].index });
@@ -244,7 +256,21 @@ export default function App() {
         <>
           {/* Sort bar */}
           <div className="sort-bar">
-            <span className="video-count">{total} videos</span>
+            <span className="video-count">
+              {searchQuery ? `${filteredVideos.length}/` : ''}{total} videos
+            </span>
+            <div className="search-box">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Filter..."
+                className="search-input"
+              />
+              {searchQuery && (
+                <button className="search-clear" onClick={() => setSearchQuery('')}>x</button>
+              )}
+            </div>
             <div className="sort-controls">
               <label>Sort:</label>
               <select value={sortField} onChange={e => handleSortField(e.target.value as SortField)}>
@@ -265,7 +291,7 @@ export default function App() {
 
           {viewMode === 'grid' ? (
             <div className="video-grid">
-              {videos.map(v => (
+              {filteredVideos.map(v => (
                 <VideoCard
                   key={v.id}
                   video={v}
@@ -293,7 +319,7 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {videos.map(v => (
+                  {filteredVideos.map(v => (
                     <VideoListRow
                       key={v.id}
                       video={v}
@@ -323,7 +349,7 @@ export default function App() {
       {lightbox && (
         <LightboxView
           video={lightbox.video}
-          videos={videos}
+          videos={filteredVideos}
           folderPath={folderPath}
           moveHistory={moveHistory}
           initialIndex={lightbox.index}

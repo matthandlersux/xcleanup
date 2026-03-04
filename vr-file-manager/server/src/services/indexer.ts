@@ -24,6 +24,22 @@ export async function indexFolder(folderPath: string, logger: any): Promise<{ fo
   const db = getDb();
   const absPath = path.resolve(folderPath);
 
+  // Validate the folder exists before touching the DB
+  try {
+    const stat = await fs.stat(absPath);
+    if (!stat.isDirectory()) {
+      throw Object.assign(new Error(`Not a directory: ${absPath}`), { code: 'ENOTDIR' });
+    }
+  } catch (e: any) {
+    if (e.code === 'ENOENT') {
+      throw Object.assign(new Error(`Folder not found: ${absPath}`), { code: 'ENOENT', statusCode: 400 });
+    }
+    if (e.code === 'ENOTDIR') {
+      throw Object.assign(new Error(`Not a directory: ${absPath}`), { code: 'ENOTDIR', statusCode: 400 });
+    }
+    throw e;
+  }
+
   db.prepare(`INSERT INTO folders (path, last_scanned_at) VALUES (?, datetime('now'))
     ON CONFLICT(path) DO UPDATE SET last_scanned_at = datetime('now')`).run(absPath);
   const folder = db.prepare('SELECT id FROM folders WHERE path = ?').get(absPath) as { id: number };

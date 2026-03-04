@@ -53,6 +53,10 @@ const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path }),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Scan failed' }));
+      throw new Error(err.error || 'Scan failed');
+    }
     return res.json();
   },
 

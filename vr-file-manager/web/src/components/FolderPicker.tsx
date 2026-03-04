@@ -13,6 +13,7 @@ export default function FolderPicker({ onScanned, onAutoScanStarted, disabled }:
   const [path, setPath] = useState('');
   const [folders, setFolders] = useState<Folder[]>([]);
   const [scanning, setScanning] = useState(false);
+  const [error, setError] = useState('');
   const [selectedFolderId, setSelectedFolderId] = useState<string>('');
   const didInit = useRef(false);
 
@@ -41,12 +42,15 @@ export default function FolderPicker({ onScanned, onAutoScanStarted, disabled }:
   const scan = async () => {
     if (!path.trim() || scanning) return;
     setScanning(true);
+    setError('');
     try {
       const result = await api.scanFolder(path.trim());
       const updated = await api.getFolders();
       setFolders(updated);
       setSelectedFolderId(String(result.folderId));
       onScanned(result.folderId);
+    } catch (e: any) {
+      setError(e.message || 'Scan failed');
     } finally {
       setScanning(false);
     }
@@ -85,6 +89,7 @@ export default function FolderPicker({ onScanned, onAutoScanStarted, disabled }:
       <button onClick={scan} disabled={scanning || disabled}>
         {scanning ? 'Scanning...' : 'Scan'}
       </button>
+      {error && <div className="scan-error">{error}</div>}
     </div>
   );
 }

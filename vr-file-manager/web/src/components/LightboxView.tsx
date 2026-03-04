@@ -63,13 +63,24 @@ export default function LightboxView({ video: initialVideo, videos, folderPath, 
 
   const changeThumb = (newIdx: number) => {
     setThumbIdx(newIdx);
-    resetView();
+    setScale(1);
+    setTranslate({ x: 0, y: 0 });
+    // Don't clear imgSize — keep clipping dimensions until the new image loads
   };
 
   const setMode = (mode: LBViewMode) => {
     setViewMode(mode);
     if (mode === 'normal') setVrMode(false);
-    resetView();
+    setScale(1);
+    setTranslate({ x: 0, y: 0 });
+    // Recalculate imgSize from existing element instead of clearing it,
+    // since onLoad won't fire again for an already-loaded image
+    const el = splitImgRef.current;
+    if (el && el.complete && mode !== 'normal') {
+      setImgSize({ w: el.offsetWidth, h: el.offsetHeight });
+    } else {
+      setImgSize(null);
+    }
     // Save stereo mode preference
     if (mode === 'split-v') api.setStereoMode(video.id, 'sbs');
     else if (mode === 'split-h') api.setStereoMode(video.id, 'tb');
@@ -99,10 +110,10 @@ export default function LightboxView({ video: initialVideo, videos, folderPath, 
     const onKey = (e: KeyboardEvent) => {
       if (modal) return; // Don't navigate while modal is open
       if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowLeft') goToVideo(-1);
-      if (e.key === 'ArrowRight') goToVideo(1);
-      if (e.key === 'ArrowUp') { e.preventDefault(); changeThumb(Math.max(0, thumbIdx - 1)); }
-      if (e.key === 'ArrowDown') { e.preventDefault(); changeThumb(Math.min(thumbCount - 1, thumbIdx + 1)); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); changeThumb(Math.max(0, thumbIdx - 1)); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); changeThumb(Math.min(thumbCount - 1, thumbIdx + 1)); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); goToVideo(-1); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); goToVideo(1); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -148,13 +159,13 @@ export default function LightboxView({ video: initialVideo, videos, folderPath, 
     const minSwipe = 50;
 
     if (absDx > absDy && absDx > minSwipe) {
-      // Horizontal swipe — navigate videos
-      if (dx < 0) goToVideo(1);
-      else goToVideo(-1);
-    } else if (absDy > absDx && absDy > minSwipe) {
-      // Vertical swipe — navigate thumbnails
-      if (dy < 0) changeThumb(Math.min(thumbCount - 1, thumbIdx + 1));
+      // Horizontal swipe — navigate thumbnails
+      if (dx < 0) changeThumb(Math.min(thumbCount - 1, thumbIdx + 1));
       else changeThumb(Math.max(0, thumbIdx - 1));
+    } else if (absDy > absDx && absDy > minSwipe) {
+      // Vertical swipe — navigate videos
+      if (dy < 0) goToVideo(1);
+      else goToVideo(-1);
     }
   };
 
@@ -290,12 +301,20 @@ export default function LightboxView({ video: initialVideo, videos, folderPath, 
         </div>
       )}
 
-      {/* Video navigation arrows */}
+      {/* Thumbnail navigation arrows (left/right) */}
+      {thumbCount > 1 && thumbIdx > 0 && (
+        <button className="lb-nav-arrow lb-nav-left" onClick={e => { e.stopPropagation(); changeThumb(thumbIdx - 1); }}>&#8249;</button>
+      )}
+      {thumbCount > 1 && thumbIdx < thumbCount - 1 && (
+        <button className="lb-nav-arrow lb-nav-right" onClick={e => { e.stopPropagation(); changeThumb(thumbIdx + 1); }}>&#8250;</button>
+      )}
+
+      {/* Video navigation arrows (up/down) */}
       {videoIndex > 0 && (
-        <button className="lb-nav-arrow lb-nav-left" onClick={e => { e.stopPropagation(); goToVideo(-1); }}>&#8249;</button>
+        <button className="lb-thumb-arrow lb-thumb-up" onClick={e => { e.stopPropagation(); goToVideo(-1); }}>&#x25B2;</button>
       )}
       {videoIndex < videos.length - 1 && (
-        <button className="lb-nav-arrow lb-nav-right" onClick={e => { e.stopPropagation(); goToVideo(1); }}>&#8250;</button>
+        <button className="lb-thumb-arrow lb-thumb-down" onClick={e => { e.stopPropagation(); goToVideo(1); }}>&#x25BC;</button>
       )}
 
       {/* Content */}
@@ -363,9 +382,9 @@ export default function LightboxView({ video: initialVideo, videos, folderPath, 
         <span className="lightbox-hint-desktop">
           {vrMode
             ? ' \u2014 Drag to look around, scroll to zoom FOV'
-            : ' \u2014 \u2190/\u2192 videos, \u2191/\u2193 thumbs, scroll zoom'}
+            : ' \u2014 \u2190/\u2192 thumbs, \u2191/\u2193 videos, scroll zoom'}
         </span>
-        <span className="lightbox-hint-mobile"> &mdash; Swipe to navigate</span>
+        <span className="lightbox-hint-mobile"> &mdash; Swipe L/R thumbs, U/D videos</span>
       </div>
 
       {/* Modal */}
