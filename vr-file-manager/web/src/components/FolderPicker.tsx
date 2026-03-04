@@ -23,16 +23,18 @@ export default function FolderPicker({ onScanned, onAutoScanStarted, disabled }:
 
     api.getFolders().then(loaded => {
       setFolders(loaded);
-      // Auto-select the most recently scanned folder
       if (loaded.length > 0) {
-        const first = loaded[0];
-        setSelectedFolderId(String(first.id));
-        setPath(first.path);
-        onScanned(first.id);
+        // Prefer the folder the user last selected (localStorage), fall back to most recent
+        const savedId = localStorage.getItem('selectedFolderId');
+        const match = savedId ? loaded.find(f => f.id === Number(savedId)) : null;
+        const pick = match || loaded[0];
+        setSelectedFolderId(String(pick.id));
+        setPath(pick.path);
+        onScanned(pick.id);
         // Fire-and-forget auto-scan — only once per page load
         if (!autoScannedOnce) {
           autoScannedOnce = true;
-          if (onAutoScanStarted) onAutoScanStarted(first.id);
+          if (onAutoScanStarted) onAutoScanStarted(pick.id);
           api.autoScan().catch(() => {});
         }
       }
@@ -48,6 +50,7 @@ export default function FolderPicker({ onScanned, onAutoScanStarted, disabled }:
       const updated = await api.getFolders();
       setFolders(updated);
       setSelectedFolderId(String(result.folderId));
+      localStorage.setItem('selectedFolderId', String(result.folderId));
       onScanned(result.folderId);
     } catch (e: any) {
       setError(e.message || 'Scan failed');
@@ -59,8 +62,10 @@ export default function FolderPicker({ onScanned, onAutoScanStarted, disabled }:
   const selectFolder = (folderId: string) => {
     setSelectedFolderId(folderId);
     if (folderId === '') {
+      localStorage.removeItem('selectedFolderId');
       onScanned(undefined);
     } else {
+      localStorage.setItem('selectedFolderId', folderId);
       const f = folders.find(f => f.id === Number(folderId));
       if (f) {
         setPath(f.path);
