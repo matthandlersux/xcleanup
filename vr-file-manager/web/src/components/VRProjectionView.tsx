@@ -3,6 +3,7 @@ import { useRef, useEffect, useCallback, useState } from 'react';
 interface Props {
   src: string;
   crop: 'full' | 'left' | 'right' | 'top' | 'bottom';
+  projectionDegrees: number;
 }
 
 const VERT_SHADER = `
@@ -13,9 +14,6 @@ void main() {
   gl_Position = vec4(a_pos, 0.0, 1.0);
 }`;
 
-// u_lens: 1.0 = rectilinear, 0.0 = equidistant fisheye, <0 = even flatter (stereographic-ish).
-// Interpolates between fisheye (theta = r * half_fov) and rectilinear (theta = atan(r * tan(half_fov))),
-// then for negative values applies additional radial compression to flatten further.
 const FRAG_SHADER = `
 precision highp float;
 varying vec2 v_uv;
@@ -23,8 +21,8 @@ uniform sampler2D u_tex;
 uniform float u_yaw;
 uniform float u_pitch;
 uniform float u_fov;
-uniform float u_lens;
 uniform float u_aspect;
+uniform float u_h_range;
 uniform vec4 u_crop;
 
 const float PI = 3.14159265359;
@@ -34,20 +32,8 @@ void main() {
   float r = length(centered);
   float half_fov = u_fov * 0.5;
 
-  float theta_fish = r * half_fov;
-  float theta_rect = atan(r * tan(half_fov));
-
-  float theta;
-  if (u_lens >= 0.0) {
-    // 0..1: blend from fisheye to rectilinear
-    theta = mix(theta_fish, theta_rect, u_lens);
-  } else {
-    // Negative: go beyond rectilinear — compress edges even more.
-    // Apply radial compression: shrink the effective radius at edges.
-    float compress = 1.0 + u_lens * r * r;  // u_lens is negative, so this shrinks r at edges
-    compress = max(compress, 0.05);
-    theta = atan(r * compress * tan(half_fov));
-  }
+  // Pure rectilinear projection
+  float theta = atan(r * tan(half_fov));
   theta = clamp(theta, 0.0, PI * 0.499);
 
   vec2 dir2d = r > 0.001 ? centered / r : vec2(0.0, 1.0);
@@ -65,14 +51,23 @@ void main() {
   float cy = cos(u_yaw), sy = sin(u_yaw);
   ray = vec3(cy * ray.x + sy * ray.z, ray.y, -sy * ray.x + cy * ray.z);
 
-  float lon = atan(ray.z, ray.x);
+  // Spherical coords — fixed: atan(x, z) not atan(z, x)
+  float lon = atan(ray.x, ray.z);
   float lat = asin(clamp(ray.y, -1.0, 1.0));
 
+  // Map to UV using content angular range
   vec2 eq_uv = vec2(
-    lon / (2.0 * PI) + 0.5,
+    lon / u_h_range + 0.5,
     0.5 - lat / PI
   );
 
+  // Black for out-of-bounds areas
+  if (eq_uv.x < 0.0 || eq_uv.x > 1.0 || eq_uv.y < 0.0 || eq_uv.y > 1.0) {
+    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    return;
+  }
+
+  // Apply crop (SBS/TB eye selection)
   eq_uv = eq_uv * u_crop.zw + u_crop.xy;
   gl_FragColor = texture2D(u_tex, eq_uv);
 }`;
@@ -109,14 +104,14 @@ function singleEyeAspect(imgW: number, imgH: number, crop: Props['crop']): numbe
 }
 
 const DEFAULT_FOV = Math.PI / 3;
-const DEFAULT_LENS = 1.0; // rectilinear; 0 = fisheye equidistant; <0 = flatter than rectilinear
+const MIN_FOV_DEG = 12;
+const MAX_FOV_DEG = 170;
 const CANVAS_HEIGHT = 720;
 
-export default function VRProjectionView({ src, crop }: Props) {
+export default function VRProjectionView({ src, crop, projectionDegrees }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const stateRef = useRef({ yaw: 0, pitch: 0, fov: DEFAULT_FOV, lens: DEFAULT_LENS, dragging: false, lastX: 0, lastY: 0 });
+  const stateRef = useRef({ yaw: 0, pitch: 0, fov: DEFAULT_FOV, dragging: false, lastX: 0, lastY: 0 });
   const [fovDisplay, setFovDisplay] = useState(DEFAULT_FOV);
-  const [lensDisplay, setLensDisplay] = useState(DEFAULT_LENS);
   const [canvasWidth, setCanvasWidth] = useState(1280);
   const [aspect, setAspect] = useState(16 / 9);
   const glRef = useRef<{ gl: WebGLRenderingContext; locs: Record<string, WebGLUniformLocation>; tex: WebGLTexture } | null>(null);
@@ -125,6 +120,8 @@ export default function VRProjectionView({ src, crop }: Props) {
   cropRef.current = crop;
   const aspectRef = useRef(aspect);
   aspectRef.current = aspect;
+  const projRef = useRef(projectionDegrees);
+  projRef.current = projectionDegrees;
 
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -150,8 +147,8 @@ export default function VRProjectionView({ src, crop }: Props) {
       u_yaw: gl.getUniformLocation(prog, 'u_yaw')!,
       u_pitch: gl.getUniformLocation(prog, 'u_pitch')!,
       u_fov: gl.getUniformLocation(prog, 'u_fov')!,
-      u_lens: gl.getUniformLocation(prog, 'u_lens')!,
       u_aspect: gl.getUniformLocation(prog, 'u_aspect')!,
+      u_h_range: gl.getUniformLocation(prog, 'u_h_range')!,
       u_crop: gl.getUniformLocation(prog, 'u_crop')!,
     };
 
@@ -184,12 +181,17 @@ export default function VRProjectionView({ src, crop }: Props) {
     gl.uniform1f(locs.u_yaw, s.yaw);
     gl.uniform1f(locs.u_pitch, s.pitch);
     gl.uniform1f(locs.u_fov, s.fov);
-    gl.uniform1f(locs.u_lens, s.lens);
     gl.uniform1f(locs.u_aspect, aspectRef.current);
+    gl.uniform1f(locs.u_h_range, projRef.current * Math.PI / 180);
     const c = cropToVec4(cropRef.current);
     gl.uniform4f(locs.u_crop, c[0], c[1], c[2], c[3]);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }, []);
+
+  // Re-render when projectionDegrees changes
+  useEffect(() => {
+    render();
+  }, [projectionDegrees, render]);
 
   // Load image, measure its natural size, compute correct aspect & canvas size
   useEffect(() => {
@@ -247,15 +249,11 @@ export default function VRProjectionView({ src, crop }: Props) {
   }, [render]);
 
   const updateFov = useCallback((newFov: number) => {
-    const clamped = Math.max(0.2, Math.min(Math.PI * 0.7, newFov));
+    const minFov = MIN_FOV_DEG * Math.PI / 180;
+    const maxFov = MAX_FOV_DEG * Math.PI / 180;
+    const clamped = Math.max(minFov, Math.min(maxFov, newFov));
     stateRef.current.fov = clamped;
     setFovDisplay(clamped);
-    scheduleRender();
-  }, [scheduleRender]);
-
-  const updateLens = useCallback((val: number) => {
-    stateRef.current.lens = val;
-    setLensDisplay(val);
     scheduleRender();
   }, [scheduleRender]);
 
@@ -265,12 +263,6 @@ export default function VRProjectionView({ src, crop }: Props) {
   }, [updateFov]);
 
   const fovDegrees = Math.round(fovDisplay * 180 / Math.PI);
-  // Slider: -100 (flattest) to 0 (fisheye). Internal lens: -1.0 to 1.0.
-  // Slider value = -(lens * 100), so slider -100 = lens -1, slider 0 = lens 1 (rectilinear), slider 100 = lens 0 (fisheye)
-  // Actually simpler: slider directly controls lens from -1.0 to 1.0
-  // Left of slider = -1.0 (flattest), right = 1.0 (rectilinear... no that's backwards)
-  // Let's just: slider 0..200, maps to lens -1.0..1.0
-  const sliderVal = Math.round((lensDisplay + 1.0) * 100); // -1→0, 0→100, 1→200
 
   return (
     <div className="vr-container" onClick={e => e.stopPropagation()}>
@@ -290,22 +282,11 @@ export default function VRProjectionView({ src, crop }: Props) {
           <label>FOV: {fovDegrees}°</label>
           <input
             type="range"
-            min="12"
-            max="126"
+            min={MIN_FOV_DEG}
+            max={MAX_FOV_DEG}
             value={fovDegrees}
             onChange={e => updateFov(Number(e.target.value) * Math.PI / 180)}
           />
-        </div>
-        <div className="vr-slider">
-          <label className="vr-lens-label">Flat</label>
-          <input
-            type="range"
-            min="0"
-            max="200"
-            value={sliderVal}
-            onChange={e => updateLens(Number(e.target.value) / 100 - 1.0)}
-          />
-          <label className="vr-lens-label">Round</label>
         </div>
       </div>
     </div>

@@ -621,11 +621,29 @@ button.danger:hover { background: #8b2525; }
   gap: 8px;
 }
 .vr-slider label { white-space: nowrap; min-width: 70px; }
-.vr-lens-label { min-width: auto !important; font-size: 11px; color: #999; }
 .vr-slider input[type="range"] {
   width: 120px;
   accent-color: #3498db;
 }
+
+/* Projection mode selector in toolbar */
+.lb-proj-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.lb-proj-input {
+  width: 48px;
+  padding: 4px 6px;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.1);
+  color: #e0e0e0;
+  font-size: 12px;
+  text-align: center;
+  backdrop-filter: blur(8px);
+}
+.lb-proj-input::placeholder { color: #888; }
 
 .lightbox-nav {
   display: flex;

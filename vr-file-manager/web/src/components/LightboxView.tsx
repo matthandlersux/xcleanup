@@ -42,6 +42,8 @@ export default function LightboxView({ video: initialVideo, videos, folderPath, 
   const defaultViewMode = video.stereo_mode === 'tb' ? 'split-h' : 'split-v';
   const [viewMode, setViewMode] = useState<LBViewMode>(defaultViewMode);
   const [vrMode, setVrMode] = useState(false);
+  const [projectionDeg, setProjectionDeg] = useState(180);
+  const [customProjInput, setCustomProjInput] = useState('');
   const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(null);
   const splitImgRef = useRef<HTMLImageElement>(null);
 
@@ -261,6 +263,34 @@ export default function LightboxView({ video: initialVideo, videos, folderPath, 
             VR Look Around
           </button>
         )}
+        {vrMode && viewMode !== 'normal' && (
+          <>
+            <span className="lb-separator" />
+            <div className="lb-proj-group">
+              <button onClick={() => setProjectionDeg(180)} className={`lb-btn ${projectionDeg === 180 ? 'lb-btn-active' : ''}`}>180</button>
+              <button onClick={() => setProjectionDeg(360)} className={`lb-btn ${projectionDeg === 360 ? 'lb-btn-active' : ''}`}>360</button>
+              <input
+                className="lb-proj-input"
+                type="text"
+                inputMode="numeric"
+                placeholder="deg"
+                value={customProjInput}
+                onChange={e => setCustomProjInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const v = parseInt(customProjInput, 10);
+                    if (v >= 90 && v <= 360) { setProjectionDeg(v); setCustomProjInput(''); }
+                  }
+                }}
+                onBlur={() => {
+                  const v = parseInt(customProjInput, 10);
+                  if (v >= 90 && v <= 360) { setProjectionDeg(v); setCustomProjInput(''); }
+                }}
+                onClick={e => e.stopPropagation()}
+              />
+            </div>
+          </>
+        )}
         <span className="lb-separator" />
         <button className="lb-btn" onClick={() => openModal('rename')}>Rename</button>
         <button className="lb-btn" onClick={() => openModal('move')}>Move</button>
@@ -292,6 +322,27 @@ export default function LightboxView({ video: initialVideo, videos, folderPath, 
           {viewMode !== 'normal' && (
             <button className={`lb-btn ${vrMode ? 'lb-btn-active' : ''}`} onClick={() => { setVrMode(v => !v); resetView(); }}>VR Look Around</button>
           )}
+          {vrMode && viewMode !== 'normal' && (
+            <div className="lb-proj-group">
+              <button onClick={() => setProjectionDeg(180)} className={`lb-btn ${projectionDeg === 180 ? 'lb-btn-active' : ''}`}>180</button>
+              <button onClick={() => setProjectionDeg(360)} className={`lb-btn ${projectionDeg === 360 ? 'lb-btn-active' : ''}`}>360</button>
+              <input
+                className="lb-proj-input"
+                type="text"
+                inputMode="numeric"
+                placeholder="deg"
+                value={customProjInput}
+                onChange={e => setCustomProjInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const v = parseInt(customProjInput, 10);
+                    if (v >= 90 && v <= 360) { setProjectionDeg(v); setCustomProjInput(''); }
+                  }
+                }}
+                onClick={e => e.stopPropagation()}
+              />
+            </div>
+          )}
           <button className="lb-btn" onClick={() => { openModal('rename'); setShowMobileMenu(false); }}>Rename</button>
           <button className="lb-btn" onClick={() => { openModal('move'); setShowMobileMenu(false); }}>Move</button>
           <button className="lb-btn lb-btn-danger" onClick={() => { openModal('delete'); setShowMobileMenu(false); }}>Delete</button>
@@ -319,7 +370,7 @@ export default function LightboxView({ video: initialVideo, videos, folderPath, 
 
       {/* Content */}
       {vrMode && viewMode !== 'normal' ? (
-        <VRProjectionView src={thumbSrc} crop={getCrop()} />
+        <VRProjectionView src={thumbSrc} crop={getCrop()} projectionDegrees={projectionDeg} />
       ) : viewMode !== 'normal' ? (
         <div
           className="split-wrap"
