@@ -2,37 +2,92 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import api, { Video } from '../api.js';
 import VRProjectionView from './VRProjectionView.js';
 
-type ViewMode = 'normal' | 'split-h' | 'split-v';
+type LBViewMode = 'normal' | 'split-h' | 'split-v';
+type Modal = null | 'delete' | 'rename' | 'move';
 
 interface Props {
   video: Video;
+  videos: Video[];
+  folderPath: string;
+  moveHistory: string[];
   initialIndex: number;
   onClose: () => void;
+  onAction: () => void;
+  onNavigate: (videoId: number) => void;
 }
 
-export default function LightboxView({ video, initialIndex, onClose }: Props) {
-  const [index, setIndex] = useState(initialIndex);
+function formatDate(dateStr: string): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'Z');
+  return d.toLocaleDateString();
+}
+
+function getParentFolder(videoPath: string, folderPath: string): string {
+  const videoDir = videoPath.substring(0, videoPath.lastIndexOf('/'));
+  if (videoDir === folderPath || videoDir.length <= folderPath.length) return '';
+  return videoDir.substring(folderPath.length + 1);
+}
+
+export default function LightboxView({ video: initialVideo, videos, folderPath, moveHistory, initialIndex, onClose, onAction, onNavigate }: Props) {
+  const [currentVideoId, setCurrentVideoId] = useState(initialVideo.id);
+  const video = videos.find(v => v.id === currentVideoId) || initialVideo;
+
+  const sortedThumbs = [...video.thumbs].sort((a, b) => a.index - b.index);
+  // Find thumb index matching initialIndex or default to 0
+  const startThumbIdx = sortedThumbs.findIndex(t => t.index === initialIndex);
+  const [thumbIdx, setThumbIdx] = useState(Math.max(0, startThumbIdx));
+
   const [scale, setScale] = useState(1);
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
-  const [viewMode, setViewMode] = useState<ViewMode>('normal');
+  const defaultViewMode = video.stereo_mode === 'tb' ? 'split-h' : 'split-v';
+  const [viewMode, setViewMode] = useState<LBViewMode>(defaultViewMode);
   const [vrMode, setVrMode] = useState(false);
   const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(null);
   const splitImgRef = useRef<HTMLImageElement>(null);
 
-  const thumbCount = video.thumbs.length;
-  const thumbSrc = api.thumbUrl(video.id, index);
+  // Modal state
+  const [modal, setModal] = useState<Modal>(null);
+  const [modalInput, setModalInput] = useState('');
+  const [modalLoading, setModalLoading] = useState(false);
+
+  // More screenshots state
+  const [generatingMore, setGeneratingMore] = useState(false);
+
+  const thumbCount = sortedThumbs.length;
+  const currentThumb = sortedThumbs[thumbIdx];
+  const thumbSrc = currentThumb ? api.thumbUrl(currentThumb) : '';
+
+  const parentFolder = getParentFolder(video.path, folderPath);
 
   const resetView = () => { setScale(1); setTranslate({ x: 0, y: 0 }); setImgSize(null); };
 
-  const changeIndex = (newIndex: number) => {
-    setIndex(newIndex);
+  const changeThumb = (newIdx: number) => {
+    setThumbIdx(newIdx);
     resetView();
   };
 
-  const setMode = (mode: ViewMode) => {
+  const setMode = (mode: LBViewMode) => {
     setViewMode(mode);
     if (mode === 'normal') setVrMode(false);
     resetView();
+    // Save stereo mode preference
+    if (mode === 'split-v') api.setStereoMode(video.id, 'sbs');
+    else if (mode === 'split-h') api.setStereoMode(video.id, 'tb');
+  };
+
+  // Navigate to next/prev video
+  const videoIndex = videos.findIndex(v => v.id === currentVideoId);
+
+  const goToVideo = (direction: -1 | 1) => {
+    const newIdx = videoIndex + direction;
+    if (newIdx < 0 || newIdx >= videos.length) return;
+    const newVideo = videos[newIdx];
+    setCurrentVideoId(newVideo.id);
+    setThumbIdx(0);
+    resetView();
+    const newViewMode = newVideo.stereo_mode === 'tb' ? 'split-h' : 'split-v';
+    setViewMode(newViewMode);
+    onNavigate(newVideo.id);
   };
 
   const onWheel = useCallback((e: React.WheelEvent) => {
@@ -42,15 +97,18 @@ export default function LightboxView({ video, initialIndex, onClose }: Props) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (modal) return; // Don't navigate while modal is open
       if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowLeft') changeIndex(Math.max(0, index - 1));
-      if (e.key === 'ArrowRight') changeIndex(Math.min(thumbCount - 1, index + 1));
+      if (e.key === 'ArrowLeft') goToVideo(-1);
+      if (e.key === 'ArrowRight') goToVideo(1);
+      if (e.key === 'ArrowUp') { e.preventDefault(); changeThumb(Math.max(0, thumbIdx - 1)); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); changeThumb(Math.min(thumbCount - 1, thumbIdx + 1)); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, thumbCount, index]);
+  });
 
-  // Drag to pan when zoomed (non-VR mode)
+  // Drag to pan when zoomed
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
@@ -65,7 +123,6 @@ export default function LightboxView({ video, initialIndex, onClose }: Props) {
   };
   const onMouseUp = () => setDragging(false);
 
-  // Determine crop for split views
   const getCrop = (): 'full' | 'left' | 'top' => {
     if (viewMode === 'split-v') return 'left';
     if (viewMode === 'split-h') return 'top';
@@ -75,10 +132,70 @@ export default function LightboxView({ video, initialIndex, onClose }: Props) {
   const imageTransform = `scale(${scale}) translate(${translate.x / scale}px, ${translate.y / scale}px)`;
   const imageCursor = scale > 1 ? (dragging ? 'grabbing' : 'grab') : 'default';
 
+  // Modal actions
+  const openModal = (type: Modal) => {
+    if (type === 'rename') setModalInput(video.filename);
+    else if (type === 'move') setModalInput(moveHistory[0] || '');
+    else setModalInput('');
+    setModal(type);
+  };
+
+  const handleModalConfirm = async () => {
+    setModalLoading(true);
+    try {
+      if (modal === 'delete') {
+        await api.deleteVideo(video.id);
+        onAction();
+        // Navigate to next video or close
+        if (videos.length <= 1) { onClose(); return; }
+        const nextIdx = videoIndex < videos.length - 1 ? videoIndex + 1 : videoIndex - 1;
+        const nextVideo = videos[nextIdx];
+        if (nextVideo) {
+          setCurrentVideoId(nextVideo.id);
+          setThumbIdx(0);
+          resetView();
+          onNavigate(nextVideo.id);
+        } else {
+          onClose();
+        }
+      } else if (modal === 'rename') {
+        await api.renameVideo(video.id, modalInput);
+        onAction();
+      } else if (modal === 'move') {
+        await api.moveVideo(video.id, modalInput);
+        onAction();
+        // Navigate to next video after move
+        if (videos.length <= 1) { onClose(); return; }
+        const nextIdx = videoIndex < videos.length - 1 ? videoIndex + 1 : videoIndex - 1;
+        const nextVideo = videos[nextIdx];
+        if (nextVideo) {
+          setCurrentVideoId(nextVideo.id);
+          setThumbIdx(0);
+          resetView();
+          onNavigate(nextVideo.id);
+        } else {
+          onClose();
+        }
+      }
+      setModal(null);
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleMoreScreenshots = async () => {
+    setGeneratingMore(true);
+    try {
+      await api.requestMoreThumbnails(video.id, 15);
+    } catch {}
+    // SSE events will update the thumbs — keep button in "generating" state briefly
+    setTimeout(() => setGeneratingMore(false), 3000);
+  };
+
   return (
     <div
       className="lightbox-overlay"
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={e => { if (e.target === e.currentTarget && !modal) onClose(); }}
     >
       {/* Toolbar */}
       <div className="lightbox-toolbar" onClick={e => e.stopPropagation()}>
@@ -96,7 +213,27 @@ export default function LightboxView({ video, initialIndex, onClose }: Props) {
             VR Look Around
           </button>
         )}
+        <span className="lb-separator" />
+        <button className="lb-btn" onClick={() => openModal('rename')}>Rename</button>
+        <button className="lb-btn" onClick={() => openModal('move')}>Move</button>
+        <button className="lb-btn lb-btn-danger" onClick={() => openModal('delete')}>Delete</button>
+        <span className="lb-separator" />
+        <button
+          className="lb-btn"
+          onClick={handleMoreScreenshots}
+          disabled={generatingMore}
+        >
+          {generatingMore ? 'Generating...' : 'More Screenshots'}
+        </button>
       </div>
+
+      {/* Video navigation arrows */}
+      {videoIndex > 0 && (
+        <button className="lb-nav-arrow lb-nav-left" onClick={e => { e.stopPropagation(); goToVideo(-1); }}>&#8249;</button>
+      )}
+      {videoIndex < videos.length - 1 && (
+        <button className="lb-nav-arrow lb-nav-right" onClick={e => { e.stopPropagation(); goToVideo(1); }}>&#8250;</button>
+      )}
 
       {/* Content */}
       {vrMode && viewMode !== 'normal' ? (
@@ -117,7 +254,7 @@ export default function LightboxView({ video, initialIndex, onClose }: Props) {
           <img
             ref={splitImgRef}
             src={thumbSrc}
-            alt={`${video.filename} thumbnail ${index + 1}`}
+            alt={`${video.filename} thumbnail ${thumbIdx + 1}`}
             className="split-img"
             style={{ transform: imageTransform, cursor: imageCursor }}
             draggable={false}
@@ -130,7 +267,7 @@ export default function LightboxView({ video, initialIndex, onClose }: Props) {
       ) : (
         <img
           src={thumbSrc}
-          alt={`${video.filename} thumbnail ${index + 1}`}
+          alt={`${video.filename} thumbnail ${thumbIdx + 1}`}
           style={{ transform: imageTransform, cursor: imageCursor }}
           onWheel={onWheel}
           onMouseDown={onMouseDown}
@@ -141,23 +278,74 @@ export default function LightboxView({ video, initialIndex, onClose }: Props) {
         />
       )}
 
-      {/* Navigation dots */}
-      <div className="lightbox-nav">
-        {Array.from({ length: thumbCount }, (_, i) => (
-          <button
-            key={i}
-            className={i === index ? 'active' : ''}
-            onClick={(e) => { e.stopPropagation(); changeIndex(i); }}
-          />
-        ))}
-      </div>
+      {/* Thumbnail navigation dots */}
+      {thumbCount > 0 && (
+        <div className="lightbox-nav">
+          {sortedThumbs.map((t, i) => (
+            <button
+              key={t.index}
+              className={i === thumbIdx ? 'active' : ''}
+              onClick={(e) => { e.stopPropagation(); changeThumb(i); }}
+            />
+          ))}
+        </div>
+      )}
 
       <div className="lightbox-info">
-        {video.filename} &mdash; {index + 1}/{thumbCount}
+        <strong>{video.filename}</strong>
+        {' '}&mdash; {thumbIdx + 1}/{thumbCount}
+        {parentFolder && <> &mdash; {parentFolder}</>}
+        {video.created_at && <> &mdash; {formatDate(video.created_at)}</>}
+        {' '}&mdash; {videoIndex + 1}/{videos.length}
         {vrMode
           ? ' \u2014 Drag to look around, scroll to zoom FOV'
-          : ' \u2014 Scroll to zoom, drag to pan, arrow keys to navigate'}
+          : ' \u2014 ←/→ videos, ↑/↓ thumbs, scroll zoom'}
       </div>
+
+      {/* Modal */}
+      {modal && (
+        <div className="modal-overlay" onClick={e => { e.stopPropagation(); setModal(null); }}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h3>
+              {modal === 'delete' && 'Delete Video'}
+              {modal === 'rename' && 'Rename Video'}
+              {modal === 'move' && 'Move Video'}
+            </h3>
+            {modal === 'delete' ? (
+              <p style={{ marginBottom: 16, color: '#cc8888' }}>
+                Permanently delete <strong>{video.filename}</strong> from disk?
+              </p>
+            ) : (
+              <>
+                {modal === 'move' && moveHistory.length > 0 && (
+                  <div className="move-history-picks">
+                    {moveHistory.map(h => (
+                      <button key={h} className="history-pick" onClick={() => setModalInput(h)}>{h}</button>
+                    ))}
+                  </div>
+                )}
+                <input
+                  value={modalInput}
+                  onChange={e => setModalInput(e.target.value)}
+                  placeholder={modal === 'rename' ? 'New filename' : 'Destination folder path'}
+                  onKeyDown={e => e.key === 'Enter' && handleModalConfirm()}
+                  autoFocus
+                />
+              </>
+            )}
+            <div className="modal-actions">
+              <button onClick={() => setModal(null)}>Cancel</button>
+              <button
+                className={modal === 'delete' ? 'danger' : ''}
+                onClick={handleModalConfirm}
+                disabled={modalLoading}
+              >
+                {modalLoading ? 'Working...' : modal === 'delete' ? 'Delete' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

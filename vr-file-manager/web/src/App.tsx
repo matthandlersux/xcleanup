@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import api, { Video, VideoListResponse } from './api.js';
+import api, { Video, VideoListResponse, SortField, SortOrder } from './api.js';
 import FolderPicker from './components/FolderPicker.js';
 import VideoCard from './components/VideoCard.js';
+import VideoListRow from './components/VideoListRow.js';
 import LightboxView from './components/LightboxView.js';
 
 interface ScanState {
@@ -11,14 +12,29 @@ interface ScanState {
   thumbProgress?: { done: number; total: number };
 }
 
+type ViewMode = 'grid' | 'list';
+type Modal = null | 'delete' | 'rename' | 'move';
+
 export default function App() {
   const [folderId, setFolderId] = useState<number | undefined>();
+  const [folderPath, setFolderPath] = useState('');
   const [videos, setVideos] = useState<Video[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [lastMoveFolder, setLastMoveFolder] = useState('');
+  const [moveHistory, setMoveHistory] = useState<string[]>([]);
   const [lightbox, setLightbox] = useState<{ video: Video; index: number } | null>(null);
   const [scan, setScan] = useState<ScanState>({ phase: 'idle', message: '' });
+
+  // Sort & view
+  const [sortField, setSortField] = useState<SortField>('filename');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+
+  // Modal state for list-view actions
+  const [modalVideo, setModalVideo] = useState<Video | null>(null);
+  const [modal, setModal] = useState<Modal>(null);
+  const [modalInput, setModalInput] = useState('');
+  const [modalLoading, setModalLoading] = useState(false);
 
   // Track which videos are currently being probed/thumbnailed
   const [probingIds, setProbingIds] = useState<Set<number>>(new Set());
@@ -27,26 +43,42 @@ export default function App() {
   const limit = 50;
   const folderIdRef = useRef(folderId);
   folderIdRef.current = folderId;
+  const sortFieldRef = useRef(sortField);
+  sortFieldRef.current = sortField;
+  const sortOrderRef = useRef(sortOrder);
+  sortOrderRef.current = sortOrder;
 
   const loadVideos = useCallback(async (fid?: number) => {
     const id = fid ?? folderIdRef.current;
     if (!id) return;
-    const data = await api.getVideos(id, page, limit);
+    const data = await api.getVideos(id, page, limit, sortFieldRef.current, sortOrderRef.current);
     setVideos(data.videos);
     setTotal(data.total);
   }, [page]);
 
-  // Load settings once
-  useEffect(() => {
-    api.getSettings().then(s => {
-      if (s.last_move_folder) setLastMoveFolder(s.last_move_folder);
-    });
+  const loadMoveHistory = useCallback(async () => {
+    const h = await api.getMoveHistory();
+    setMoveHistory(h);
   }, []);
 
-  // Load videos when folder/page changes
+  // Load move history once
+  useEffect(() => { loadMoveHistory(); }, [loadMoveHistory]);
+
+  // Load videos when folder/page/sort changes
   useEffect(() => {
     if (folderId) loadVideos(folderId);
-  }, [folderId, loadVideos]);
+  }, [folderId, loadVideos, sortField, sortOrder]);
+
+  // When folder is selected, remember its path
+  const handleFolderScanned = useCallback((fid?: number) => {
+    setFolderId(fid);
+    if (fid) {
+      api.getFolders().then(folders => {
+        const f = folders.find(f => f.id === fid);
+        if (f) setFolderPath(f.path);
+      });
+    }
+  }, []);
 
   // Subscribe to SSE
   useEffect(() => {
@@ -81,7 +113,6 @@ export default function App() {
       },
       'probe:done': (data) => {
         setProbingIds(s => { const n = new Set(s); n.delete(data.videoId); return n; });
-        // Refresh the video list to get updated metadata
         loadVideos();
       },
       'thumb:status': (data) => {
@@ -89,7 +120,6 @@ export default function App() {
           setScan(s => s.phase === 'idle' ? s : { phase: 'done', message: `All done! ${data.total} videos processed.`, thumbProgress: undefined });
           setThumbingIds(new Set());
           loadVideos();
-          // Clear "done" after a few seconds
           setTimeout(() => setScan(s => s.phase === 'done' ? { phase: 'idle', message: '' } : s), 4000);
         } else if (data.running) {
           setScan(s => ({ ...s, phase: 'thumbnails', thumbProgress: { done: data.done, total: data.total } }));
@@ -104,22 +134,70 @@ export default function App() {
           thumbProgress: { done: data.done, total: data.total },
         }));
       },
-      'thumb:generated': (data) => {
-        // Refresh to show new thumbnail
+      'thumb:generated': () => {
         loadVideos();
       },
     });
     return unsub;
   }, [loadVideos]);
 
+  // Modal actions (shared between grid and list view)
+  const openModal = (video: Video, type: 'rename' | 'move' | 'delete') => {
+    setModalVideo(video);
+    setModal(type);
+    if (type === 'rename') setModalInput(video.filename);
+    else if (type === 'move') setModalInput(moveHistory[0] || '');
+    else setModalInput('');
+  };
+
+  const handleModalConfirm = async () => {
+    if (!modalVideo) return;
+    setModalLoading(true);
+    try {
+      if (modal === 'delete') await api.deleteVideo(modalVideo.id);
+      else if (modal === 'rename') await api.renameVideo(modalVideo.id, modalInput);
+      else if (modal === 'move') {
+        await api.moveVideo(modalVideo.id, modalInput);
+        loadMoveHistory();
+      }
+      setModal(null);
+      setModalVideo(null);
+      loadVideos();
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleLightboxAction = async () => {
+    loadVideos();
+    loadMoveHistory();
+  };
+
+  const toggleSortOrder = () => setSortOrder(o => o === 'asc' ? 'desc' : 'asc');
+  const handleListSort = (field: SortField) => {
+    if (field === sortField) toggleSortOrder();
+    else { setSortField(field); setSortOrder('asc'); }
+  };
+
+  const sortArrow = (field: SortField) => field === sortField ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : '';
+
   const totalPages = Math.ceil(total / limit);
+
+  // Navigate lightbox to next/prev video
+  const handleLightboxNavigate = (videoId: number) => {
+    const v = videos.find(v => v.id === videoId);
+    if (v && v.thumbs.length > 0) {
+      const sorted = [...v.thumbs].sort((a, b) => a.index - b.index);
+      setLightbox({ video: v, index: sorted[0].index });
+    }
+  };
 
   return (
     <div className="app">
       <div className="header">
         <h1>VR File Manager</h1>
         <FolderPicker
-          onScanned={setFolderId}
+          onScanned={handleFolderScanned}
           disabled={scan.phase !== 'idle' && scan.phase !== 'done'}
         />
       </div>
@@ -156,20 +234,74 @@ export default function App() {
         </div>
       ) : (
         <>
-          <div className="video-count">{total} videos</div>
-          <div className="video-grid">
-            {videos.map(v => (
-              <VideoCard
-                key={v.id}
-                video={v}
-                lastMoveFolder={lastMoveFolder}
-                isProbing={probingIds.has(v.id)}
-                isThumbing={thumbingIds.has(v.id)}
-                onAction={() => loadVideos()}
-                onThumbClick={(video, index) => setLightbox({ video, index })}
-              />
-            ))}
+          {/* Sort bar */}
+          <div className="sort-bar">
+            <span className="video-count">{total} videos</span>
+            <div className="sort-controls">
+              <label>Sort:</label>
+              <select value={sortField} onChange={e => setSortField(e.target.value as SortField)}>
+                <option value="filename">Filename</option>
+                <option value="path">Path</option>
+                <option value="size_bytes">Size</option>
+                <option value="created_at">Date</option>
+              </select>
+              <button className="sort-order-btn" onClick={toggleSortOrder}>
+                {sortOrder === 'asc' ? '▲ Asc' : '▼ Desc'}
+              </button>
+              <div className="view-toggle">
+                <button className={viewMode === 'grid' ? 'active' : ''} onClick={() => setViewMode('grid')}>Grid</button>
+                <button className={viewMode === 'list' ? 'active' : ''} onClick={() => setViewMode('list')}>List</button>
+              </div>
+            </div>
           </div>
+
+          {viewMode === 'grid' ? (
+            <div className="video-grid">
+              {videos.map(v => (
+                <VideoCard
+                  key={v.id}
+                  video={v}
+                  folderPath={folderPath}
+                  moveHistory={moveHistory}
+                  isProbing={probingIds.has(v.id)}
+                  isThumbing={thumbingIds.has(v.id)}
+                  onAction={() => { loadVideos(); loadMoveHistory(); }}
+                  onThumbClick={(video, index) => setLightbox({ video, index })}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="video-list-wrap">
+              <table className="video-list">
+                <thead>
+                  <tr>
+                    <th style={{ width: 64 }}></th>
+                    <th className="sortable" onClick={() => handleListSort('filename')}>Filename{sortArrow('filename')}</th>
+                    <th className="sortable" onClick={() => handleListSort('path')}>Folder{sortArrow('path')}</th>
+                    <th>Duration</th>
+                    <th className="sortable" onClick={() => handleListSort('size_bytes')}>Size{sortArrow('size_bytes')}</th>
+                    <th className="sortable" onClick={() => handleListSort('created_at')}>Date{sortArrow('created_at')}</th>
+                    <th style={{ width: 120 }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {videos.map(v => (
+                    <VideoListRow
+                      key={v.id}
+                      video={v}
+                      folderPath={folderPath}
+                      isProbing={probingIds.has(v.id)}
+                      isThumbing={thumbingIds.has(v.id)}
+                      onAction={() => { loadVideos(); loadMoveHistory(); }}
+                      onThumbClick={(video, index) => setLightbox({ video, index })}
+                      onOpenActions={openModal}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           {totalPages > 1 && (
             <div className="pagination">
               <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Prev</button>
@@ -183,9 +315,59 @@ export default function App() {
       {lightbox && (
         <LightboxView
           video={lightbox.video}
+          videos={videos}
+          folderPath={folderPath}
+          moveHistory={moveHistory}
           initialIndex={lightbox.index}
           onClose={() => setLightbox(null)}
+          onAction={handleLightboxAction}
+          onNavigate={handleLightboxNavigate}
         />
+      )}
+
+      {/* Shared modal for list-view actions */}
+      {modal && modalVideo && (
+        <div className="modal-overlay" onClick={() => setModal(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h3>
+              {modal === 'delete' && 'Delete Video'}
+              {modal === 'rename' && 'Rename Video'}
+              {modal === 'move' && 'Move Video'}
+            </h3>
+            {modal === 'delete' ? (
+              <p style={{ marginBottom: 16, color: '#cc8888' }}>
+                Permanently delete <strong>{modalVideo.filename}</strong> from disk?
+              </p>
+            ) : (
+              <>
+                {modal === 'move' && moveHistory.length > 0 && (
+                  <div className="move-history-picks">
+                    {moveHistory.map(h => (
+                      <button key={h} className="history-pick" onClick={() => setModalInput(h)}>{h}</button>
+                    ))}
+                  </div>
+                )}
+                <input
+                  value={modalInput}
+                  onChange={e => setModalInput(e.target.value)}
+                  placeholder={modal === 'rename' ? 'New filename' : 'Destination folder path'}
+                  onKeyDown={e => e.key === 'Enter' && handleModalConfirm()}
+                  autoFocus
+                />
+              </>
+            )}
+            <div className="modal-actions">
+              <button onClick={() => setModal(null)}>Cancel</button>
+              <button
+                className={modal === 'delete' ? 'danger' : ''}
+                onClick={handleModalConfirm}
+                disabled={modalLoading}
+              >
+                {modalLoading ? 'Working...' : modal === 'delete' ? 'Delete' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -8,8 +8,19 @@ export interface Video {
   width: number | null;
   height: number | null;
   codec: string | null;
+  created_at: string;
+  stereo_mode: 'sbs' | 'tb';
+  thumb_hash: string | null;
+  folder_path: string;
   deleted: number;
-  thumbs: { index: number; videoId: number }[];
+  thumbs: ThumbInfo[];
+}
+
+export interface ThumbInfo {
+  index: number;
+  videoId: number;
+  thumb_hash: string | null;
+  timestamp_secs: number;
 }
 
 export interface VideoListResponse {
@@ -32,6 +43,9 @@ export interface ScanResult {
   removed: number;
 }
 
+export type SortField = 'filename' | 'path' | 'size_bytes' | 'created_at';
+export type SortOrder = 'asc' | 'desc';
+
 const api = {
   async scanFolder(path: string): Promise<ScanResult> {
     const res = await fetch('/api/folders/scan', {
@@ -42,13 +56,21 @@ const api = {
     return res.json();
   },
 
+  async autoScan(): Promise<ScanResult | null> {
+    const res = await fetch('/api/folders/auto-scan', { method: 'POST' });
+    if (!res.ok) return null;
+    return res.json();
+  },
+
   async getFolders(): Promise<Folder[]> {
     return (await fetch('/api/folders')).json();
   },
 
-  async getVideos(folderId?: number, page = 1, limit = 50): Promise<VideoListResponse> {
+  async getVideos(folderId?: number, page = 1, limit = 50, sort?: SortField, order?: SortOrder): Promise<VideoListResponse> {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) });
     if (folderId) params.set('folderId', String(folderId));
+    if (sort) params.set('sort', sort);
+    if (order) params.set('order', order);
     return (await fetch(`/api/videos?${params}`)).json();
   },
 
@@ -72,12 +94,36 @@ const api = {
     })).json();
   },
 
+  async setStereoMode(id: number, stereoMode: 'sbs' | 'tb') {
+    return (await fetch(`/api/videos/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stereoMode }),
+    })).json();
+  },
+
+  async requestMoreThumbnails(id: number, count = 15) {
+    return (await fetch(`/api/videos/${id}/thumbnails`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ count }),
+    })).json();
+  },
+
+  async getMoveHistory(): Promise<string[]> {
+    return (await fetch('/api/move-history')).json();
+  },
+
   async getSettings(): Promise<Record<string, string>> {
     return (await fetch('/api/settings')).json();
   },
 
-  thumbUrl(videoId: number, index: number) {
-    return `/thumbs/${videoId}/${index}.jpg`;
+  thumbUrl(thumb: ThumbInfo): string {
+    if (thumb.thumb_hash) {
+      return `/thumbs/${thumb.thumb_hash}/${thumb.timestamp_secs.toFixed(2)}.jpg`;
+    }
+    // Legacy fallback
+    return `/thumbs/${thumb.videoId}/${thumb.index}.jpg`;
   },
 
   subscribeEvents(handlers: Record<string, (data: any) => void>): () => void {

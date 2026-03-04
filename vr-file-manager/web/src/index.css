@@ -85,6 +85,63 @@ button.danger:hover { background: #8b2525; }
   transition: width 0.3s ease;
 }
 
+/* Sort bar */
+.sort-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sort-bar .video-count {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 0;
+}
+
+.sort-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sort-controls label {
+  font-size: 13px;
+  color: #888;
+}
+
+.sort-controls select {
+  padding: 4px 8px;
+  border: 1px solid #333;
+  border-radius: 4px;
+  background: #16213e;
+  color: #e0e0e0;
+  font-size: 13px;
+}
+
+.sort-order-btn {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 0;
+  margin-left: 8px;
+}
+.view-toggle button {
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 0;
+  border: 1px solid #333;
+  background: #16213e;
+}
+.view-toggle button:first-child { border-radius: 4px 0 0 4px; }
+.view-toggle button:last-child { border-radius: 0 4px 4px 0; }
+.view-toggle button.active { background: #0f3460; border-color: #2980b9; }
+
 .video-count {
   font-size: 13px;
   color: #888;
@@ -134,6 +191,29 @@ button.danger:hover { background: #8b2525; }
   object-fit: cover;
   cursor: pointer;
   display: block;
+}
+
+/* SBS/TB eye crop for thumbnails */
+.thumb-eye-crop {
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+.thumb-eye-crop img {
+  display: block;
+  object-fit: cover;
+  cursor: pointer;
+}
+.thumb-eye-crop--sbs img {
+  width: 200%;
+  max-width: none;
+  height: 100%;
+}
+.thumb-eye-crop--tb img {
+  width: 100%;
+  height: 200%;
+  max-height: none;
 }
 
 .thumb-prev, .thumb-next {
@@ -213,6 +293,7 @@ button.danger:hover { background: #8b2525; }
 }
 .video-card .meta span { margin-right: 12px; }
 .meta-pending { color: #e67e22; font-style: italic; }
+.parent-folder { color: #6a9fd8; }
 
 .video-card .actions {
   display: flex;
@@ -220,6 +301,90 @@ button.danger:hover { background: #8b2525; }
   flex-wrap: wrap;
 }
 .video-card .actions button { font-size: 12px; padding: 4px 10px; }
+
+/* Video list view */
+.video-list-wrap {
+  overflow-x: auto;
+}
+
+.video-list {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.video-list th {
+  text-align: left;
+  padding: 8px 12px;
+  background: #16213e;
+  border-bottom: 1px solid #333;
+  color: #999;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.video-list th.sortable { cursor: pointer; }
+.video-list th.sortable:hover { color: #ddd; }
+
+.video-list td {
+  padding: 6px 12px;
+  border-bottom: 1px solid #1a1a2e;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.video-list tbody tr:hover { background: rgba(15, 52, 96, 0.3); }
+.video-list tbody tr.row-working { background: rgba(230, 126, 34, 0.1); }
+
+.list-thumb-cell {
+  width: 64px;
+  padding: 4px 8px;
+}
+.list-thumb-cell .thumb-eye-crop {
+  width: 48px;
+  height: 36px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.list-thumb-cell .thumb-eye-crop img {
+  width: 200%;
+  max-width: none;
+  height: 100%;
+  object-fit: cover;
+}
+.list-thumb-cell .thumb-eye-crop--tb img {
+  width: 100%;
+  height: 200%;
+  max-height: none;
+}
+.list-thumb-placeholder {
+  width: 48px;
+  height: 36px;
+  background: #0a0a1a;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+  font-size: 11px;
+}
+
+.list-filename {
+  cursor: pointer;
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.list-filename:hover { color: #3498db; }
+
+.list-actions {
+  display: flex;
+  gap: 4px;
+}
+.list-actions button {
+  font-size: 11px;
+  padding: 2px 8px;
+}
 
 /* Modal */
 .modal-overlay {
@@ -229,7 +394,7 @@ button.danger:hover { background: #8b2525; }
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 300;
 }
 
 .modal {
@@ -255,6 +420,27 @@ button.danger:hover { background: #8b2525; }
   gap: 8px;
   justify-content: flex-end;
 }
+
+/* Move history picks */
+.move-history-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.history-pick {
+  font-size: 11px;
+  padding: 4px 10px;
+  background: #0a1a3a;
+  border: 1px solid #2980b9;
+  border-radius: 4px;
+  color: #6a9fd8;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-pick:hover { background: #0f3460; color: #e0e0e0; }
 
 /* Lightbox */
 .lightbox-overlay {
@@ -286,6 +472,8 @@ button.danger:hover { background: #8b2525; }
   display: flex;
   gap: 6px;
   z-index: 210;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 .lb-btn {
   padding: 6px 14px;
@@ -296,6 +484,34 @@ button.danger:hover { background: #8b2525; }
 }
 .lb-btn:hover { background: rgba(255,255,255,0.2); }
 .lb-btn-active { background: #2980b9; border-color: #3498db; }
+.lb-btn-danger { color: #e88; border-color: rgba(200,80,80,0.4); }
+.lb-btn-danger:hover { background: rgba(200,80,80,0.3); }
+
+.lb-separator {
+  width: 1px;
+  background: rgba(255,255,255,0.15);
+  align-self: stretch;
+  margin: 0 4px;
+}
+
+/* Lightbox video navigation arrows */
+.lb-nav-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0,0,0,0.6);
+  border: none;
+  color: #ddd;
+  font-size: 36px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  z-index: 210;
+  line-height: 1;
+}
+.lb-nav-arrow:hover { background: rgba(0,0,0,0.85); }
+.lb-nav-left { left: 16px; }
+.lb-nav-right { right: 16px; }
 
 /* Split view: wrapper clips to one eye, sized by JS to half the image */
 .split-wrap {
@@ -347,6 +563,9 @@ button.danger:hover { background: #8b2525; }
   display: flex;
   gap: 8px;
   margin-top: 16px;
+  flex-wrap: wrap;
+  max-width: 80vw;
+  justify-content: center;
 }
 .lightbox-nav button {
   width: 10px;
@@ -362,6 +581,8 @@ button.danger:hover { background: #8b2525; }
   color: #888;
   font-size: 13px;
   margin-top: 8px;
+  text-align: center;
+  max-width: 90vw;
 }
 
 .pagination {

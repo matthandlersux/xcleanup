@@ -3,6 +3,7 @@ import path from 'path';
 import { getDb } from '../db.js';
 import { probeVideo } from './ffmpeg.js';
 import { emit } from '../events.js';
+import { computeThumbHash } from './thumbHash.js';
 
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.webm']);
 
@@ -37,11 +38,26 @@ export async function indexFolder(folderPath: string, logger: any): Promise<{ fo
   emit('scan:status', { phase: 'indexing', total: videoPaths.length });
 
   let newVideos = 0;
-  const insertStmt = db.prepare('INSERT OR IGNORE INTO videos (folder_id, filename, path) VALUES (?, ?, ?)');
+  const insertStmt = db.prepare('INSERT OR IGNORE INTO videos (folder_id, filename, path, size_bytes, thumb_hash) VALUES (?, ?, ?, ?, ?)');
+  const updateHashStmt = db.prepare('UPDATE videos SET size_bytes = COALESCE(size_bytes, ?), thumb_hash = ? WHERE path = ? AND thumb_hash IS NULL');
 
   for (const vp of videoPaths) {
-    const result = insertStmt.run(folder.id, path.basename(vp), vp);
-    if (result.changes > 0) newVideos++;
+    const filename = path.basename(vp);
+    let sizeBytes: number | null = null;
+    let thumbHash: string | null = null;
+    try {
+      const stat = await fs.stat(vp);
+      sizeBytes = stat.size;
+      thumbHash = computeThumbHash(filename, sizeBytes);
+    } catch {}
+
+    const result = insertStmt.run(folder.id, filename, vp, sizeBytes, thumbHash);
+    if (result.changes > 0) {
+      newVideos++;
+    } else if (thumbHash) {
+      // Existing video without thumb_hash — update it
+      updateHashStmt.run(sizeBytes, thumbHash, vp);
+    }
   }
 
   // Mark missing videos as deleted, unmark returned ones
@@ -55,6 +71,35 @@ export async function indexFolder(folderPath: string, logger: any): Promise<{ fo
       removed++;
     } else {
       undeleteStmt.run(v.id);
+    }
+  }
+
+  // Recover thumbnails from disk for videos that have a thumb_hash but no DB thumbnails
+  const thumbsDir = path.join(path.dirname(path.dirname(new URL(import.meta.url).pathname)), '..', 'thumbnails');
+  const videosWithHash = db.prepare(
+    `SELECT v.id, v.thumb_hash FROM videos v
+     WHERE v.folder_id = ? AND v.deleted = 0 AND v.thumb_hash IS NOT NULL
+     AND (SELECT COUNT(*) FROM thumbnails t WHERE t.video_id = v.id) = 0`
+  ).all(folder.id) as { id: number; thumb_hash: string }[];
+
+  const recoverThumbStmt = db.prepare('INSERT OR IGNORE INTO thumbnails (video_id, index_num, timestamp_secs, path) VALUES (?, ?, ?, ?)');
+  for (const v of videosWithHash) {
+    const hashDir = path.join(thumbsDir, v.thumb_hash);
+    try {
+      const files = await fs.readdir(hashDir);
+      const jpgs = files.filter(f => f.endsWith('.jpg')).sort();
+      for (let i = 0; i < jpgs.length; i++) {
+        const tsMatch = jpgs[i].match(/^(.+)\.jpg$/);
+        if (!tsMatch) continue;
+        const timestampSecs = parseFloat(tsMatch[1]);
+        if (isNaN(timestampSecs)) continue;
+        recoverThumbStmt.run(v.id, i, timestampSecs, path.join(hashDir, jpgs[i]));
+      }
+      if (jpgs.length > 0) {
+        logger.info({ videoId: v.id, count: jpgs.length }, 'Recovered thumbnails from disk');
+      }
+    } catch {
+      // No thumbnail dir on disk — skip
     }
   }
 

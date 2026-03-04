@@ -26,6 +26,10 @@ check-web:
 build-web:
     cd web && npx vite build
 
+# Migrate thumbnails from ID-based to hash-based directories
+migrate-thumbs:
+    cd server && npx tsx src/migrate-thumbs.ts
+
 # Clean generated files (thumbnails, db, node_modules)
 clean:
     rm -rf thumbnails server/data/*.db server/data/*.db-* server/node_modules web/node_modules web/dist

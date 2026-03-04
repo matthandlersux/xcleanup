@@ -3,7 +3,8 @@ import api, { Video } from '../api.js';
 
 interface Props {
   video: Video;
-  lastMoveFolder: string;
+  folderPath: string;
+  moveHistory: string[];
   isProbing: boolean;
   isThumbing: boolean;
   onAction: () => void;
@@ -25,18 +26,32 @@ function formatDuration(secs: number | null): string {
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
 }
 
+function formatDate(dateStr: string): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'Z');
+  return d.toLocaleDateString();
+}
+
+function getParentFolder(videoPath: string, folderPath: string): string {
+  const videoDir = videoPath.substring(0, videoPath.lastIndexOf('/'));
+  if (videoDir === folderPath || videoDir.length <= folderPath.length) return '';
+  return videoDir.substring(folderPath.length + 1);
+}
+
 type Modal = null | 'delete' | 'rename' | 'move';
 
-export default function VideoCard({ video, lastMoveFolder, isProbing, isThumbing, onAction, onThumbClick }: Props) {
+export default function VideoCard({ video, folderPath, moveHistory, isProbing, isThumbing, onAction, onThumbClick }: Props) {
   const [modal, setModal] = useState<Modal>(null);
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [thumbIdx, setThumbIdx] = useState(0);
   const sortedThumbs = [...video.thumbs].sort((a, b) => a.index - b.index);
+  const stereo = video.stereo_mode || 'sbs';
+  const parentFolder = getParentFolder(video.path, folderPath);
 
   const openModal = (type: Modal) => {
     if (type === 'rename') setInputValue(video.filename);
-    else if (type === 'move') setInputValue(lastMoveFolder);
+    else if (type === 'move') setInputValue(moveHistory[0] || '');
     else setInputValue('');
     setModal(type);
   };
@@ -62,12 +77,14 @@ export default function VideoCard({ video, lastMoveFolder, isProbing, isThumbing
       <div className="thumbs">
         {hasAnyThumb ? (
           <>
-            <img
-              src={api.thumbUrl(video.id, sortedThumbs[thumbIdx]?.index ?? 0)}
-              alt={`Thumbnail ${thumbIdx + 1}`}
-              onClick={() => onThumbClick(video, sortedThumbs[thumbIdx]?.index ?? 0)}
-              loading="lazy"
-            />
+            <div className={`thumb-eye-crop thumb-eye-crop--${stereo}`}>
+              <img
+                src={api.thumbUrl(sortedThumbs[thumbIdx])}
+                alt={`Thumbnail ${thumbIdx + 1}`}
+                onClick={() => onThumbClick(video, sortedThumbs[thumbIdx]?.index ?? 0)}
+                loading="lazy"
+              />
+            </div>
             {sortedThumbs.length > 1 && (
               <>
                 <button className="thumb-prev" onClick={e => { e.stopPropagation(); setThumbIdx(i => (i - 1 + sortedThumbs.length) % sortedThumbs.length); }}>&#8249;</button>
@@ -101,6 +118,8 @@ export default function VideoCard({ video, lastMoveFolder, isProbing, isThumbing
           {video.width && video.height && <span>{video.width}x{video.height}</span>}
           {video.size_bytes && <span>{formatSize(video.size_bytes)}</span>}
           {video.codec && <span>{video.codec}</span>}
+          {video.created_at && <span>{formatDate(video.created_at)}</span>}
+          {parentFolder && <span className="parent-folder">{parentFolder}</span>}
         </div>
         <div className="actions">
           <button onClick={() => openModal('rename')}>Rename</button>
@@ -122,13 +141,22 @@ export default function VideoCard({ video, lastMoveFolder, isProbing, isThumbing
                 Permanently delete <strong>{video.filename}</strong> from disk?
               </p>
             ) : (
-              <input
-                value={inputValue}
-                onChange={e => setInputValue(e.target.value)}
-                placeholder={modal === 'rename' ? 'New filename' : 'Destination folder path'}
-                onKeyDown={e => e.key === 'Enter' && handleConfirm()}
-                autoFocus
-              />
+              <>
+                {modal === 'move' && moveHistory.length > 0 && (
+                  <div className="move-history-picks">
+                    {moveHistory.map(h => (
+                      <button key={h} className="history-pick" onClick={() => setInputValue(h)}>{h}</button>
+                    ))}
+                  </div>
+                )}
+                <input
+                  value={inputValue}
+                  onChange={e => setInputValue(e.target.value)}
+                  placeholder={modal === 'rename' ? 'New filename' : 'Destination folder path'}
+                  onKeyDown={e => e.key === 'Enter' && handleConfirm()}
+                  autoFocus
+                />
+              </>
             )}
             <div className="modal-actions">
               <button onClick={() => setModal(null)}>Cancel</button>
