@@ -1,0 +1,7 @@
+node_modules/
+dist/
+thumbnails/
+server/data/*.db
+server/data/*.db-*
+*.tsbuildinfo
+yarn-error.log
