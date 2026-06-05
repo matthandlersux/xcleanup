@@ -1,0 +1,19 @@
+name: xcleanup-dev
+
+services:
+  app:
+    build: .
+    ports:
+      - "3002:3002"
+    volumes:
+      - ./:/app
+      - /app/backend/tmp
+      - /app/frontend/node_modules
+      - ./data:/data
+      - /mnt/krumbus:/mnt/krumbus
+      - ${HOME}/.local/share/vlc/ml.xspf:/vlc/ml.xspf:ro
+    env_file:
+      - .env
+    environment:
+      - PORT=8080
+      - VITE_PORT=3002
