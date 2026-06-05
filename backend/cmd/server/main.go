@@ -8,10 +8,12 @@ import (
 
 	"xcleanup/internal/api"
 	"xcleanup/internal/apply"
+	"xcleanup/internal/events"
 	"xcleanup/internal/patterns"
 	"xcleanup/internal/scan"
 	"xcleanup/internal/store"
 	"xcleanup/internal/thumbs"
+	"xcleanup/internal/vr"
 )
 
 func env(k, def string) string {
@@ -31,8 +33,15 @@ func main() {
 	topDir := env("TOP_DIR", "/mnt/krumbus/top")
 	vlcPath := env("VLC_ML_PATH", "/vlc/ml.xspf")
 
+	vrThumbDir := env("VR_THUMB_DIR", "/data/vr-thumbs")
+	vrSourceDB := env("VR_SOURCE_DB", "/vr-source/server/data/app.db")
+	vrSourceThumbs := env("VR_SOURCE_THUMBS", "/vr-source/thumbnails")
+
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
 		log.Fatalf("mkdir data dir: %v", err)
+	}
+	if err := os.MkdirAll(vrThumbDir, 0o755); err != nil {
+		log.Fatalf("mkdir vr thumb dir: %v", err)
 	}
 
 	st, err := store.Open(dbPath)
@@ -54,6 +63,18 @@ func main() {
 	scanner := scan.New(archiveDir, vlcPath, matcher, st)
 	ap := &apply.Engine{Store: st, GroupedDir: groupedDir, ArchiveDir: archiveDir, TopDir: topDir}
 
+	// VR section.
+	vrStore := vr.NewStore(st.DB())
+	vrBus := events.NewBus()
+	vrIndexer := &vr.Indexer{Store: vrStore, Bus: vrBus, ThumbDir: vrThumbDir}
+	vrThumber := &vr.Thumbnailer{Store: vrStore, Bus: vrBus, ThumbDir: vrThumbDir, Concurrency: 2}
+	vrSrv := &vr.Server{Store: vrStore, Indexer: vrIndexer, Thumbnailer: vrThumber, Bus: vrBus, ThumbDir: vrThumbDir}
+
+	// One-time migration from vr-file-manager, idempotent.
+	if err := vr.MigrateFromVRFM(st.DB(), vrSourceDB, vrSourceThumbs, vrThumbDir); err != nil {
+		log.Printf("vr migration error (non-fatal): %v", err)
+	}
+
 	srv := &api.Server{
 		Store:      st,
 		Matcher:    matcher,
@@ -64,6 +85,7 @@ func main() {
 		GroupedDir: groupedDir,
 		TopDir:     topDir,
 		VLCPath:    vlcPath,
+		VR:         vrSrv,
 	}
 
 	log.Printf("xcleanup api listening on :%s", port)

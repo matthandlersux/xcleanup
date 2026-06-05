@@ -49,6 +49,56 @@ CREATE TABLE IF NOT EXISTS actions (
     success INTEGER NOT NULL,
     error TEXT
 );
+
+-- VR section: mirrors vr-file-manager's schema. INTEGER timestamps for
+-- scan/created_at (epoch seconds), preserves IDs from the source DB on
+-- migration.
+CREATE TABLE IF NOT EXISTS vr_folders (
+    id INTEGER PRIMARY KEY,
+    path TEXT NOT NULL UNIQUE,
+    last_scanned_at INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS vr_videos (
+    id INTEGER PRIMARY KEY,
+    folder_id INTEGER NOT NULL REFERENCES vr_folders(id),
+    filename TEXT NOT NULL,
+    path TEXT NOT NULL UNIQUE,
+    size_bytes INTEGER,
+    duration_secs REAL,
+    width INTEGER,
+    height INTEGER,
+    codec TEXT,
+    created_at INTEGER,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    stereo_mode TEXT NOT NULL DEFAULT 'sbs',
+    thumb_hash TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_vr_videos_folder ON vr_videos(folder_id);
+CREATE INDEX IF NOT EXISTS idx_vr_videos_path ON vr_videos(path);
+
+CREATE TABLE IF NOT EXISTS vr_thumbnails (
+    id INTEGER PRIMARY KEY,
+    video_id INTEGER NOT NULL REFERENCES vr_videos(id),
+    index_num INTEGER NOT NULL,
+    timestamp_secs REAL NOT NULL,
+    path TEXT NOT NULL,
+    created_at INTEGER,
+    UNIQUE(video_id, index_num)
+);
+CREATE INDEX IF NOT EXISTS idx_vr_thumbs_video ON vr_thumbnails(video_id);
+
+CREATE TABLE IF NOT EXISTS vr_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
+
+CREATE TABLE IF NOT EXISTS vr_move_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    folder_path TEXT NOT NULL UNIQUE,
+    used_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_vr_move_history_used ON vr_move_history(used_at DESC);
 `
 
 func Open(path string) (*Store, error) {
@@ -63,6 +113,10 @@ func Open(path string) (*Store, error) {
 }
 
 func (s *Store) Close() error { return s.db.Close() }
+
+// DB exposes the underlying connection so adjacent packages (e.g. vr) can
+// share the same database file without each opening their own handle.
+func (s *Store) DB() *sql.DB { return s.db }
 
 type FileRecord struct {
 	ID          int64

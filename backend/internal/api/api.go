@@ -17,6 +17,7 @@ import (
 	"xcleanup/internal/scan"
 	"xcleanup/internal/store"
 	"xcleanup/internal/thumbs"
+	"xcleanup/internal/vr"
 )
 
 type ApplyProgress struct {
@@ -41,6 +42,7 @@ type Server struct {
 	GroupedDir string
 	TopDir     string
 	VLCPath    string
+	VR         *vr.Server
 
 	scanMu     sync.Mutex
 	scanRun    bool
@@ -80,6 +82,10 @@ func (s *Server) Routes() http.Handler {
 
 	r.Get("/api/thumb/{id}.jpg", s.thumb)
 	r.Get("/api/thumb/{id}/{idx}.jpg", s.thumb)
+
+	if s.VR != nil {
+		s.VR.Mount(r)
+	}
 
 	return r
 }

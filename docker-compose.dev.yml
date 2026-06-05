@@ -11,7 +11,10 @@ services:
       - /app/frontend/node_modules
       - ./data:/data
       - /mnt/krumbus:/mnt/krumbus
+      - /media/handler:/media/handler
       - ${HOME}/.local/share/vlc/ml.xspf:/vlc/ml.xspf:ro
+      # One-time migration sources (read-only — never mutated by xcleanup):
+      - ${HOME}/Documents/code/vr-file-manager:/vr-source:ro
     env_file:
       - .env
     environment:

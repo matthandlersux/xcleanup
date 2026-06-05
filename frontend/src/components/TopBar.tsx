@@ -27,13 +27,6 @@ const ActionRow = styled(Row)`
   justify-content: flex-end;
 `;
 
-const Title = styled.h1`
-  font-size: 16px;
-  margin: 0;
-  letter-spacing: 0.5px;
-  flex-shrink: 0;
-`;
-
 const Tabs = styled.nav`
   display: flex;
   gap: 4px;
@@ -84,12 +77,12 @@ const Btn = styled.button<{ $variant?: 'primary' | 'warn' | 'danger' }>`
 `;
 
 const tabs: Array<{ to: string; label: string; key: 'all' | 'move' | 'delete' | 'recent' | 'fuzzy' | 'keep' }> = [
-  { to: '/files/all', label: 'All', key: 'all' },
-  { to: '/files/move', label: 'Auto-Move', key: 'move' },
-  { to: '/files/delete', label: 'Auto-Delete', key: 'delete' },
-  { to: '/files/recent', label: 'Recent', key: 'recent' },
-  { to: '/files/fuzzy', label: 'Fuzzy', key: 'fuzzy' },
-  { to: '/files/keep', label: 'Keep (VLC)', key: 'keep' },
+  { to: '/archive/files/all', label: 'All', key: 'all' },
+  { to: '/archive/files/move', label: 'Auto-Move', key: 'move' },
+  { to: '/archive/files/delete', label: 'Auto-Delete', key: 'delete' },
+  { to: '/archive/files/recent', label: 'Recent', key: 'recent' },
+  { to: '/archive/files/fuzzy', label: 'Fuzzy', key: 'fuzzy' },
+  { to: '/archive/files/keep', label: 'Keep (VLC)', key: 'keep' },
 ];
 
 export function TopBar() {
@@ -110,7 +103,6 @@ export function TopBar() {
   return (
     <Bar>
       <Row>
-        <Title>xcleanup</Title>
         <Tabs>
           {tabs.map((t) => {
             const c = t.key === 'all' ? total : counts[t.key] ?? 0;
