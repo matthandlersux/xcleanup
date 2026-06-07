@@ -6,10 +6,23 @@ import (
 	"time"
 )
 
+// unixSecs is a Unix epoch second value that marshals into the same
+// "YYYY-MM-DD HH:MM:SS" text the original vr-file-manager stored. The
+// frontend's formatDate appends 'Z' and lets the browser parse it.
+type unixSecs int64
+
+func (u unixSecs) MarshalJSON() ([]byte, error) {
+	if u == 0 {
+		return []byte(`""`), nil
+	}
+	t := time.Unix(int64(u), 0).UTC()
+	return []byte(`"` + t.Format("2006-01-02 15:04:05") + `"`), nil
+}
+
 type Folder struct {
-	ID            int64  `json:"id"`
-	Path          string `json:"path"`
-	LastScannedAt int64  `json:"last_scanned_at"`
+	ID            int64     `json:"id"`
+	Path          string    `json:"path"`
+	LastScannedAt unixSecs  `json:"last_scanned_at"`
 }
 
 type Video struct {
@@ -22,7 +35,7 @@ type Video struct {
 	Width        *int     `json:"width"`
 	Height       *int     `json:"height"`
 	Codec        *string  `json:"codec"`
-	CreatedAt    int64    `json:"created_at"`
+	CreatedAt    unixSecs `json:"created_at"`
 	Deleted      int      `json:"deleted"`
 	StereoMode   string   `json:"stereo_mode"`
 	ThumbHash    *string  `json:"thumb_hash"`

@@ -61,7 +61,10 @@ export default function VideoListRow({ video, folderPath, isProbing, isThumbing,
           </div>
         )}
       </td>
-      <td className="list-filename" onClick={() => firstThumb && onThumbClick(video, firstThumb.index)}>{video.filename}</td>
+      <td className="list-filename" onClick={() => firstThumb && onThumbClick(video, firstThumb.index)}>
+        {video.path.includes('/top/') && <span className="top-star" title="In a /top/ folder — protected">★ </span>}
+        {video.filename}
+      </td>
       <td>{parentFolder || '-'}</td>
       <td>{formatDuration(video.duration_secs)}</td>
       <td>{formatSize(video.size_bytes)}</td>
@@ -69,7 +72,9 @@ export default function VideoListRow({ video, folderPath, isProbing, isThumbing,
       <td className="list-actions">
         <button onClick={() => onOpenActions(video, 'rename')}>Ren</button>
         <button onClick={() => onOpenActions(video, 'move')}>Mov</button>
-        <button className="danger" onClick={() => onOpenActions(video, 'delete')}>Del</button>
+        {!video.path.includes('/top/') && (
+          <button className="danger" onClick={() => onOpenActions(video, 'delete')}>Del</button>
+        )}
       </td>
     </tr>
   );

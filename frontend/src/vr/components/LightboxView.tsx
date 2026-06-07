@@ -294,7 +294,9 @@ export default function LightboxView({ video: initialVideo, videos, folderPath, 
         <span className="lb-separator" />
         <button className="lb-btn" onClick={() => openModal('rename')}>Rename</button>
         <button className="lb-btn" onClick={() => openModal('move')}>Move</button>
-        <button className="lb-btn lb-btn-danger" onClick={() => openModal('delete')}>Delete</button>
+        {!video.path.includes('/top/') && (
+          <button className="lb-btn lb-btn-danger" onClick={() => openModal('delete')}>Delete</button>
+        )}
         <span className="lb-separator" />
         <button
           className="lb-btn"
@@ -345,7 +347,9 @@ export default function LightboxView({ video: initialVideo, videos, folderPath, 
           )}
           <button className="lb-btn" onClick={() => { openModal('rename'); setShowMobileMenu(false); }}>Rename</button>
           <button className="lb-btn" onClick={() => { openModal('move'); setShowMobileMenu(false); }}>Move</button>
-          <button className="lb-btn lb-btn-danger" onClick={() => { openModal('delete'); setShowMobileMenu(false); }}>Delete</button>
+          {!video.path.includes('/top/') && (
+            <button className="lb-btn lb-btn-danger" onClick={() => { openModal('delete'); setShowMobileMenu(false); }}>Delete</button>
+          )}
           <button className="lb-btn" onClick={() => { handleMoreScreenshots(); setShowMobileMenu(false); }} disabled={generatingMore}>
             {generatingMore ? 'Generating...' : 'More Screenshots'}
           </button>
@@ -425,6 +429,7 @@ export default function LightboxView({ video: initialVideo, videos, folderPath, 
       )}
 
       <div className="lightbox-info">
+        {video.path.includes('/top/') && <span className="top-star" title="In a /top/ folder — protected">★ </span>}
         <strong>{video.filename}</strong>
         {' '}&mdash; {thumbIdx + 1}/{thumbCount}
         {parentFolder && <> &mdash; {parentFolder}</>}

@@ -9,11 +9,18 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
 	"xcleanup/internal/events"
 )
+
+// IsProtectedPath reports whether the file lives in a "/top/" folder, which
+// the user keeps as a manually-curated save set.
+func IsProtectedPath(p string) bool {
+	return strings.Contains(p, "/top/")
+}
 
 type Server struct {
 	Store       *Store
@@ -308,6 +315,11 @@ func (s *Server) deleteVideo(w http.ResponseWriter, r *http.Request) {
 	}
 	if v == nil {
 		writeErr(w, 404, "not found")
+		return
+	}
+
+	if IsProtectedPath(v.Path) {
+		writeErr(w, 403, "files in /top/ folders are protected and cannot be deleted")
 		return
 	}
 

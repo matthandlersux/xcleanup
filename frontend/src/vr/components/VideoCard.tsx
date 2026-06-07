@@ -112,7 +112,10 @@ export default function VideoCard({ video, folderPath, moveHistory, isProbing, i
         )}
       </div>
       <div className="info">
-        <div className="filename">{video.filename}</div>
+        <div className="filename">
+          {video.path.includes('/top/') && <span className="top-star" title="In a /top/ folder — protected">★</span>}
+          {video.filename}
+        </div>
         <div className="meta">
           {video.duration_secs ? <span>{formatDuration(video.duration_secs)}</span> : isProbing ? <span className="meta-pending">probing...</span> : null}
           {video.width && video.height && <span>{video.width}x{video.height}</span>}
@@ -124,7 +127,9 @@ export default function VideoCard({ video, folderPath, moveHistory, isProbing, i
         <div className="actions">
           <button onClick={() => openModal('rename')}>Rename</button>
           <button onClick={() => openModal('move')}>Move</button>
-          <button className="danger" onClick={() => openModal('delete')}>Delete</button>
+          {!video.path.includes('/top/') && (
+            <button className="danger" onClick={() => openModal('delete')}>Delete</button>
+          )}
         </div>
       </div>
 
