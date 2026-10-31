@@ -1,9 +1,7 @@
 {
   "permissions": {
     "additionalDirectories": [
-      "/mnt/krumbus",
-      "/media/handler/gimble",
-      "/media/handler/d333672d-4e11-3ff2-80cf-61bfc06527ff"
+      "/mnt/krumbus"
     ]
   }
 }

@@ -13,7 +13,11 @@ services:
       - /app/frontend/node_modules
       - ./data:/data
       - /mnt/krumbus:/mnt/krumbus
-      - /media/handler:/media/handler
+      # Other drives: read-only, the overview only reads their sizes
+      - /mnt/gimble:/mnt/gimble:ro
+      - /mnt/xerxes:/mnt/xerxes:ro
+      - /mnt/backup:/mnt/backup:ro
+      - /mnt/teebs:/mnt/teebs:ro
       - ${HOME}/.local/share/vlc/ml.xspf:/vlc/ml.xspf:ro
       # One-time migration sources (read-only — never mutated by xcleanup):
       - ${HOME}/Documents/code/vr-file-manager:/vr-source:ro
