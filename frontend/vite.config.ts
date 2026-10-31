@@ -7,6 +7,8 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 3002,
     strictPort: true,
+    // allow requests forwarded by `tailscale serve` (nickel.<tailnet>.ts.net)
+    allowedHosts: ['.ts.net'],
     proxy: {
       '/api': {
         target: 'http://localhost:8080',

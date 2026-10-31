@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import styled from 'styled-components';
 
-const FRAME_COUNT = 3;
+export const FRAME_COUNT = 3;
 
 const Wrap = styled.div`
   position: relative;
-  width: 320px;
-  height: 180px;
+  width: 100%;
+  aspect-ratio: 16 / 9;
   background: var(--bg);
   border-radius: 4px;
   overflow: hidden;
   user-select: none;
+  cursor: zoom-in;
 `;
 
 const Img = styled.img`
@@ -71,16 +72,17 @@ const Dot = styled.button<{ $active: boolean }>`
   }
 `;
 
-export function Carousel({ id }: { id: number }) {
+export function Carousel({ id, onOpen }: { id: number; onOpen?: (idx: number) => void }) {
   const [idx, setIdx] = useState(0);
   const step = (delta: number) => setIdx((prev) => (prev + delta + FRAME_COUNT) % FRAME_COUNT);
   return (
-    <Wrap>
+    <Wrap onClick={() => onOpen?.(idx)} title={onOpen ? 'Click to enlarge' : undefined}>
       <Img src={`/api/thumb/${id}/${idx}.jpg`} alt="" loading="lazy" draggable={false} />
       <Arrow
         $side="left"
         onClick={(e) => {
           e.preventDefault();
+          e.stopPropagation();
           step(-1);
         }}
         aria-label="Previous frame"
@@ -91,6 +93,7 @@ export function Carousel({ id }: { id: number }) {
         $side="right"
         onClick={(e) => {
           e.preventDefault();
+          e.stopPropagation();
           step(1);
         }}
         aria-label="Next frame"
@@ -104,6 +107,7 @@ export function Carousel({ id }: { id: number }) {
             $active={i === idx}
             onClick={(e) => {
               e.preventDefault();
+              e.stopPropagation();
               setIdx(i);
             }}
             aria-label={`Frame ${i + 1}`}

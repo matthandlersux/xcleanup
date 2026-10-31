@@ -75,6 +75,90 @@ export type Result = Op & { success: boolean; error?: string };
 
 export type CleanupItem = { path: string; kind: 'file' | 'dir'; size?: number };
 
+export type StorageDrive = {
+  label: string;
+  path: string;
+  highlight: boolean;
+  free: number;
+  total: number;
+  used: number;
+  error?: string;
+};
+
+export type StorageBreakdownItem = {
+  label: string;
+  path: string;
+  size: number;
+  error?: string;
+};
+
+export type StorageBreakdown = {
+  drive: string;
+  items: StorageBreakdownItem[];
+};
+
+export type StorageSnapshot = {
+  drives?: StorageDrive[];
+  breakdowns?: StorageBreakdown[];
+  computed_at?: string;
+  duration_ms?: number;
+  refreshing: boolean;
+};
+
+export type GroupedSample = { path: string; name: string; size: number };
+
+export type GroupedFolder = {
+  name: string;
+  path: string;
+  video_count: number;
+  total_size: number;
+  mtime: number;
+  samples: GroupedSample[];
+};
+
+export type GroupedSnapshot = {
+  folders: GroupedFolder[];
+  computed_at: string;
+  duration_ms: number;
+};
+
+export type GroupedVideo = {
+  path: string;
+  name: string;
+  rel: string;
+  size: number;
+  mtime: number;
+};
+
+export type GroupedFolderDetail = {
+  folder: string;
+  name: string;
+  videos: GroupedVideo[];
+  total: number;
+  total_size: number;
+};
+
+export type ThumbPurge = {
+  dry_run: boolean;
+  live_videos: number;
+  orphan_dirs?: number;
+  orphan_bytes?: number;
+  removed_dirs?: number;
+  freed_bytes?: number;
+  duration_ms: number;
+};
+
+export type TopVideo = { path: string; name: string; size: number; mtime: number };
+
+export type TopVideos = {
+  videos: TopVideo[];
+  total: number;
+  initial_frames: number;
+  max_frames: number;
+};
+
+export type Decision = 'keep' | 'delete';
+
 async function req<T>(url: string, opts: RequestInit = {}): Promise<T> {
   const res = await fetch(url, {
     ...opts,
@@ -112,4 +196,37 @@ export const api = {
     req<{ items: CleanupItem[]; count: number }>('/api/cleanup-nonvideo/preview', { method: 'POST' }),
   cleanupCommit: () =>
     req<{ results: Result[]; count: number }>('/api/cleanup-nonvideo/commit', { method: 'POST' }),
+  storage: () => req<StorageSnapshot>('/api/storage'),
+  storageRefresh: () =>
+    req<{ status: string }>('/api/storage/refresh', { method: 'POST' }),
+  exclusions: () => req<{ paths: string[]; count: number }>('/api/exclusions'),
+
+  groupedFolders: (refresh = false) =>
+    req<GroupedSnapshot>(`/api/grouped/folders${refresh ? '?refresh=1' : ''}`),
+  groupedThumb: (path: string, idx: number) =>
+    `/api/grouped/thumb?path=${encodeURIComponent(path)}&idx=${idx}`,
+  groupedAction: (path: string, decision: Decision) =>
+    req<{ status: string }>('/api/grouped/action', {
+      method: 'POST',
+      body: JSON.stringify({ path, decision }),
+    }),
+  groupedVideos: (path: string) =>
+    req<GroupedFolderDetail>(`/api/grouped/videos?path=${encodeURIComponent(path)}`),
+  groupedDeleteVideo: (path: string) =>
+    req<{ status: string }>('/api/grouped/delete-video', {
+      method: 'POST',
+      body: JSON.stringify({ path }),
+    }),
+
+  thumbsPurge: (dry = false) =>
+    req<ThumbPurge>(`/api/thumbs/purge${dry ? '?dry=1' : ''}`, { method: 'POST' }),
+
+  topVideos: () => req<TopVideos>('/api/top/videos'),
+  topThumb: (path: string, idx: number) =>
+    `/api/top/thumb?path=${encodeURIComponent(path)}&idx=${idx}`,
+  topDecision: (path: string, decision: Decision) =>
+    req<{ status: string }>('/api/top/decision', {
+      method: 'POST',
+      body: JSON.stringify({ path, decision }),
+    }),
 };

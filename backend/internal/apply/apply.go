@@ -10,15 +10,16 @@ import (
 
 	"xcleanup/internal/scan"
 	"xcleanup/internal/store"
+	"xcleanup/internal/thumbs"
 )
 
 type Op struct {
-	ID          int64  `json:"id"`
-	Op          string `json:"op"` // "move" or "delete"
-	Src         string `json:"src"`
-	Dst         string `json:"dst,omitempty"`
-	Size        int64  `json:"size"`
-	Note        string `json:"note,omitempty"`
+	ID   int64  `json:"id"`
+	Op   string `json:"op"` // "move" or "delete"
+	Src  string `json:"src"`
+	Dst  string `json:"dst,omitempty"`
+	Size int64  `json:"size"`
+	Note string `json:"note,omitempty"`
 }
 
 type Result struct {
@@ -30,9 +31,20 @@ type Result struct {
 
 type Engine struct {
 	Store      *store.Store
+	Thumbs     *thumbs.Manager
 	GroupedDir string
 	ArchiveDir string
 	TopDir     string
+}
+
+// dropThumbs discards the cached stills for a deleted source file. Only ever
+// called on delete — a move keeps its cache, which is why thumbs.Key is
+// derived from basename+size rather than the full path.
+func (e *Engine) dropThumbs(path string, size int64) {
+	if e.Thumbs == nil {
+		return
+	}
+	_ = e.Thumbs.Remove(path, size)
 }
 
 // MoveToTop immediately moves a file into TopDir, with the same parent-dir
@@ -99,6 +111,7 @@ func (e *Engine) ExecuteOp(op Op) Result {
 		}
 		res.Success = true
 		_ = e.Store.LogAction("delete", op.Src, "", true, "")
+		e.dropThumbs(op.Src, op.Size)
 		e.tryCleanupParent(op.Src)
 		_ = e.Store.DeleteFileRow(op.ID)
 		return res

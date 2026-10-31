@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import api, { Video, VideoListResponse, SortField, SortOrder } from './api';
 import FolderPicker from './components/FolderPicker';
 import VideoCard from './components/VideoCard';
@@ -41,8 +41,29 @@ export default function VrApp() {
   const [modalInput, setModalInput] = useState('');
   const [modalLoading, setModalLoading] = useState(false);
 
-  // Search filter (client-side, filters current page)
-  const [searchQuery, setSearchQuery] = useState('');
+  // Settings modal
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [historyBusy, setHistoryBusy] = useState<string | null>(null);
+  const removeMoveHistoryEntry = async (path: string) => {
+    setHistoryBusy(path);
+    try {
+      await api.deleteMoveHistoryEntry(path);
+      await loadMoveHistory();
+    } finally {
+      setHistoryBusy(null);
+    }
+  };
+
+  // Search filter — runs server-side so total/pages reflect the filtered set.
+  // searchInput is the live input value; debouncedQuery is what we send.
+  const [searchInput, setSearchInput] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedQuery(searchInput), 200);
+    return () => clearTimeout(id);
+  }, [searchInput]);
+  // Reset to first page whenever the active query changes.
+  useEffect(() => { setPage(1); }, [debouncedQuery]);
 
   // Track which videos are currently being probed/thumbnailed
   const [probingIds, setProbingIds] = useState<Set<number>>(new Set());
@@ -55,11 +76,13 @@ export default function VrApp() {
   sortFieldRef.current = sortField;
   const sortOrderRef = useRef(sortOrder);
   sortOrderRef.current = sortOrder;
+  const queryRef = useRef(debouncedQuery);
+  queryRef.current = debouncedQuery;
 
   const loadVideos = useCallback(async (fid?: number) => {
     const id = fid ?? folderIdRef.current;
     if (!id) return;
-    const data = await api.getVideos(id, page, limit, sortFieldRef.current, sortOrderRef.current);
+    const data = await api.getVideos(id, page, limit, sortFieldRef.current, sortOrderRef.current, queryRef.current);
     setVideos(data.videos);
     setTotal(data.total);
   }, [page]);
@@ -72,10 +95,10 @@ export default function VrApp() {
   // Load move history once
   useEffect(() => { loadMoveHistory(); }, [loadMoveHistory]);
 
-  // Load videos when folder/page/sort changes
+  // Load videos when folder/page/sort/query changes
   useEffect(() => {
     if (folderId) loadVideos(folderId);
-  }, [folderId, loadVideos, sortField, sortOrder]);
+  }, [folderId, loadVideos, sortField, sortOrder, debouncedQuery]);
 
   // Scroll to top when page changes
   useEffect(() => { window.scrollTo(0, 0); }, [page]);
@@ -193,20 +216,11 @@ export default function VrApp() {
 
   const sortArrow = (field: SortField) => field === sortField ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : '';
 
-  const filteredVideos = useMemo(() => {
-    if (!searchQuery.trim()) return videos;
-    const q = searchQuery.toLowerCase();
-    return videos.filter(v =>
-      v.filename.toLowerCase().includes(q) ||
-      v.path.toLowerCase().includes(q)
-    );
-  }, [videos, searchQuery]);
-
   const totalPages = Math.ceil(total / limit);
 
   // Navigate lightbox to next/prev video
   const handleLightboxNavigate = (videoId: number) => {
-    const v = filteredVideos.find(v => v.id === videoId);
+    const v = videos.find(v => v.id === videoId);
     if (v && v.thumbs.length > 0) {
       const sorted = [...v.thumbs].sort((a, b) => a.index - b.index);
       setLightbox({ video: v, index: sorted[0].index });
@@ -259,18 +273,18 @@ export default function VrApp() {
           {/* Sort bar */}
           <div className="sort-bar">
             <span className="video-count">
-              {searchQuery ? `${filteredVideos.length}/` : ''}{total} videos
+              {debouncedQuery ? `${total} matching` : `${total} videos`}
             </span>
             <div className="search-box">
               <input
                 type="text"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                value={searchInput}
+                onChange={e => setSearchInput(e.target.value)}
                 placeholder="Filter..."
                 className="search-input"
               />
-              {searchQuery && (
-                <button className="search-clear" onClick={() => setSearchQuery('')}>x</button>
+              {searchInput && (
+                <button className="search-clear" onClick={() => setSearchInput('')}>x</button>
               )}
             </div>
             <div className="sort-controls">
@@ -288,12 +302,20 @@ export default function VrApp() {
                 <button className={viewMode === 'grid' ? 'active' : ''} onClick={() => setViewMode('grid')}>Grid</button>
                 <button className={viewMode === 'list' ? 'active' : ''} onClick={() => setViewMode('list')}>List</button>
               </div>
+              <button
+                className="settings-btn"
+                title="Settings"
+                aria-label="Settings"
+                onClick={() => setSettingsOpen(true)}
+              >
+                ⚙
+              </button>
             </div>
           </div>
 
           {viewMode === 'grid' ? (
             <div className="video-grid">
-              {filteredVideos.map(v => (
+              {videos.map(v => (
                 <VideoCard
                   key={v.id}
                   video={v}
@@ -321,7 +343,7 @@ export default function VrApp() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredVideos.map(v => (
+                  {videos.map(v => (
                     <VideoListRow
                       key={v.id}
                       video={v}
@@ -351,7 +373,7 @@ export default function VrApp() {
       {lightbox && (
         <LightboxView
           video={lightbox.video}
-          videos={filteredVideos}
+          videos={videos}
           folderPath={folderPath}
           moveHistory={moveHistory}
           initialIndex={lightbox.index}
@@ -401,6 +423,43 @@ export default function VrApp() {
               >
                 {modalLoading ? 'Working...' : modal === 'delete' ? 'Delete' : 'Confirm'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {settingsOpen && (
+        <div className="modal-overlay" onClick={() => setSettingsOpen(false)}>
+          <div className="modal settings-modal" onClick={e => e.stopPropagation()}>
+            <h3>Settings</h3>
+            <section className="settings-section">
+              <h4>Recently moved to</h4>
+              <p className="settings-help">
+                Folders that appear as quick picks in the Move dialog. Delete entries you added by mistake.
+              </p>
+              {moveHistory.length === 0 ? (
+                <p className="settings-empty">No recent move destinations.</p>
+              ) : (
+                <ul className="history-list">
+                  {moveHistory.map(h => (
+                    <li key={h}>
+                      <span className="history-path" title={h}>{h}</span>
+                      <button
+                        className="history-remove"
+                        disabled={historyBusy === h}
+                        onClick={() => removeMoveHistoryEntry(h)}
+                        title="Remove from history"
+                        aria-label={`Remove ${h}`}
+                      >
+                        {historyBusy === h ? '…' : '×'}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+            <div className="modal-actions">
+              <button onClick={() => setSettingsOpen(false)}>Close</button>
             </div>
           </div>
         </div>

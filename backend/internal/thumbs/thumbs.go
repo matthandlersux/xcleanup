@@ -55,6 +55,149 @@ func (m *Manager) ThumbPath(srcPath string, size int64, idx int) string {
 	return filepath.Join(m.thumbDir(srcPath, size), fmt.Sprintf("%d.jpg", idx))
 }
 
+// MaxSpreadFrames caps how deep the "fetch more screenshots" sequence can go
+// for a single video.
+const MaxSpreadFrames = 24
+
+// spreadPath is namespaced separately from ThumbPath so the two schedules
+// never collide in the cache directory.
+func (m *Manager) spreadPath(srcPath string, size int64, idx int) string {
+	return filepath.Join(m.thumbDir(srcPath, size), fmt.Sprintf("s%d.jpg", idx))
+}
+
+// spreadFraction maps a frame index to a position in (0,1) using a van der
+// Corput (bit-reversal) sequence: 1/2, 1/4, 3/4, 1/8, 5/8, 3/8, 7/8, …
+//
+// The point is that the position for a given index never changes as more
+// frames are requested. Any prefix of the sequence is well spread over the
+// runtime, so "fetch 5" and then "fetch 5 more" both look sensible and the
+// first five stay cached and stable.
+func spreadFraction(idx int) float64 {
+	n := idx + 1
+	frac, denom := 0.0, 1.0
+	for n > 0 {
+		denom *= 2
+		frac += float64(n%2) / denom
+		n /= 2
+	}
+	return frac
+}
+
+// EnsureThumbSpread generates frame `idx` of the open-ended spread schedule,
+// used by the top-review lightbox where the frame count is not fixed.
+func (m *Manager) EnsureThumbSpread(ctx context.Context, srcPath string, size int64, idx int) (string, error) {
+	if idx < 0 || idx >= MaxSpreadFrames {
+		return "", fmt.Errorf("invalid frame index %d", idx)
+	}
+	out := m.spreadPath(srcPath, size, idx)
+	if info, err := os.Stat(out); err == nil && info.Size() >= minAcceptableSize {
+		return out, nil
+	}
+
+	m.mu.Lock()
+	if ch, ok := m.inFlight[out]; ok {
+		m.mu.Unlock()
+		select {
+		case <-ch:
+		case <-ctx.Done():
+			return "", ctx.Err()
+		}
+		return out, nil
+	}
+	ch := make(chan struct{})
+	m.inFlight[out] = ch
+	m.mu.Unlock()
+
+	defer func() {
+		m.mu.Lock()
+		delete(m.inFlight, out)
+		close(ch)
+		m.mu.Unlock()
+	}()
+
+	if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
+		return "", err
+	}
+
+	ts := float64(10 * (idx + 1))
+	if dur, err := probeDuration(ctx, srcPath); err == nil && dur > 1 {
+		ts = dur * spreadFraction(idx)
+	}
+	return generate(ctx, srcPath, ts, out)
+}
+
+// Remove deletes every cached still for a video. Call this when the source
+// file is deleted — NOT when it is moved, since Key is deliberately derived
+// from basename+size so the cache survives archive → grouped moves.
+func (m *Manager) Remove(srcPath string, size int64) error {
+	dir := m.thumbDir(srcPath, size)
+	if dir == m.Dir || dir == "" {
+		return fmt.Errorf("refusing to remove thumb root")
+	}
+	return os.RemoveAll(dir)
+}
+
+// CountExcept reports what PurgeExcept would remove, without removing it.
+func (m *Manager) CountExcept(keep map[string]struct{}) (int, int64, error) {
+	entries, err := os.ReadDir(m.Dir)
+	if err != nil {
+		return 0, 0, err
+	}
+	var count int
+	var bytes int64
+	for _, ent := range entries {
+		if !ent.IsDir() {
+			continue
+		}
+		if _, ok := keep[ent.Name()]; ok {
+			continue
+		}
+		bytes += dirSize(filepath.Join(m.Dir, ent.Name()))
+		count++
+	}
+	return count, bytes, nil
+}
+
+// PurgeExcept deletes every cache directory whose key is absent from keep.
+// Returns the number of directories removed and the bytes reclaimed.
+func (m *Manager) PurgeExcept(keep map[string]struct{}) (int, int64, error) {
+	entries, err := os.ReadDir(m.Dir)
+	if err != nil {
+		return 0, 0, err
+	}
+	var removed int
+	var freed int64
+	for _, ent := range entries {
+		if !ent.IsDir() {
+			continue
+		}
+		if _, ok := keep[ent.Name()]; ok {
+			continue
+		}
+		full := filepath.Join(m.Dir, ent.Name())
+		freed += dirSize(full)
+		if err := os.RemoveAll(full); err != nil {
+			continue
+		}
+		removed++
+	}
+	return removed, freed, nil
+}
+
+func dirSize(dir string) int64 {
+	var total int64
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return 0
+	}
+	for _, ent := range entries {
+		if info, err := ent.Info(); err == nil {
+			total += info.Size()
+		}
+	}
+	return total
+}
+
 // EnsureThumb generates the requested frame if missing or if the cached file
 // looks like a degenerate (tiny) ffmpeg output.
 func (m *Manager) EnsureThumb(ctx context.Context, srcPath string, size int64, idx int) (string, error) {

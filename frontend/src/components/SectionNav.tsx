@@ -45,8 +45,17 @@ export function SectionNav() {
         <NavLink to="/archive" className={({ isActive }) => (isActive ? 'active' : '')}>
           Archive
         </NavLink>
+        <NavLink to="/grouped" className={({ isActive }) => (isActive ? 'active' : '')}>
+          Grouped
+        </NavLink>
+        <NavLink to="/top" className={({ isActive }) => (isActive ? 'active' : '')}>
+          Top
+        </NavLink>
         <NavLink to="/vr" className={({ isActive }) => (isActive ? 'active' : '')}>
           VR
+        </NavLink>
+        <NavLink to="/overview" className={({ isActive }) => (isActive ? 'active' : '')}>
+          Overview
         </NavLink>
       </Nav>
     </Wrap>

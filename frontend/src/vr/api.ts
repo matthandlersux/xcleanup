@@ -70,11 +70,12 @@ const api = {
     return (await fetch('/api/vr/folders')).json();
   },
 
-  async getVideos(folderId?: number, page = 1, limit = 50, sort?: SortField, order?: SortOrder): Promise<VideoListResponse> {
+  async getVideos(folderId?: number, page = 1, limit = 50, sort?: SortField, order?: SortOrder, q?: string): Promise<VideoListResponse> {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) });
     if (folderId) params.set('folderId', String(folderId));
     if (sort) params.set('sort', sort);
     if (order) params.set('order', order);
+    if (q && q.trim()) params.set('q', q.trim());
     return (await fetch(`/api/vr/videos?${params}`)).json();
   },
 
@@ -116,6 +117,11 @@ const api = {
 
   async getMoveHistory(): Promise<string[]> {
     return (await fetch('/api/vr/move-history')).json();
+  },
+
+  async deleteMoveHistoryEntry(path: string): Promise<void> {
+    const res = await fetch(`/api/vr/move-history?path=${encodeURIComponent(path)}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(await res.text());
   },
 
   async getSettings(): Promise<Record<string, string>> {

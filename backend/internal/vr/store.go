@@ -3,6 +3,7 @@ package vr
 import (
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -178,6 +179,7 @@ func (s *Store) UnmarkVideoDeleted(id int64) error {
 
 type ListVideosParams struct {
 	FolderID  *int64
+	Search    string // matched case-insensitive against filename and path
 	SortField string // filename | path | size_bytes | created_at
 	SortOrder string // asc | desc
 	Limit     int
@@ -198,6 +200,11 @@ func (s *Store) ListVideos(p ListVideosParams) ([]Video, int, error) {
 	if p.FolderID != nil {
 		where += " AND v.folder_id = ?"
 		args = append(args, *p.FolderID)
+	}
+	if q := strings.TrimSpace(p.Search); q != "" {
+		like := "%" + strings.ToLower(q) + "%"
+		where += " AND (LOWER(v.filename) LIKE ? OR LOWER(v.path) LIKE ?)"
+		args = append(args, like, like)
 	}
 	var total int
 	if err := s.db.QueryRow(`SELECT COUNT(*) FROM vr_videos v `+where, args...).Scan(&total); err != nil {
@@ -426,6 +433,11 @@ func (s *Store) VideosNeedingThumbs(minCount int) ([]struct {
 func (s *Store) RecordMove(folder string) error {
 	_, err := s.db.Exec(`INSERT INTO vr_move_history (folder_path, used_at) VALUES (?, ?)
         ON CONFLICT(folder_path) DO UPDATE SET used_at = excluded.used_at`, folder, time.Now().Unix())
+	return err
+}
+
+func (s *Store) DeleteMoveHistoryEntry(folder string) error {
+	_, err := s.db.Exec(`DELETE FROM vr_move_history WHERE folder_path = ?`, folder)
 	return err
 }
 

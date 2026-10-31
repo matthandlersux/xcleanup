@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -8,9 +9,11 @@ import (
 
 	"xcleanup/internal/api"
 	"xcleanup/internal/apply"
+	"xcleanup/internal/config"
 	"xcleanup/internal/events"
 	"xcleanup/internal/patterns"
 	"xcleanup/internal/scan"
+	"xcleanup/internal/storage"
 	"xcleanup/internal/store"
 	"xcleanup/internal/thumbs"
 	"xcleanup/internal/vr"
@@ -27,7 +30,7 @@ func main() {
 	port := env("PORT", "8080")
 	dbPath := env("DB_PATH", "/data/xcleanup.db")
 	thumbDir := env("THUMB_DIR", "/data/thumbs")
-	patternsPath := env("PATTERNS_PATH", "/app/patterns.json")
+	configPath := env("CONFIG_PATH", "/app/config.json")
 	archiveDir := env("ARCHIVE_DIR", "/mnt/krumbus/archive")
 	groupedDir := env("GROUPED_DIR", "/mnt/krumbus/grouped")
 	topDir := env("TOP_DIR", "/mnt/krumbus/top")
@@ -44,15 +47,20 @@ func main() {
 		log.Fatalf("mkdir vr thumb dir: %v", err)
 	}
 
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		log.Fatalf("load config: %v", err)
+	}
+
 	st, err := store.Open(dbPath)
 	if err != nil {
 		log.Fatalf("open store: %v", err)
 	}
 	defer st.Close()
 
-	matcher, err := patterns.Load(patternsPath)
+	matcher, err := patterns.New(cfg.Patterns.Destinations)
 	if err != nil {
-		log.Fatalf("load patterns: %v", err)
+		log.Fatalf("compile patterns: %v", err)
 	}
 
 	tm, err := thumbs.New(thumbDir)
@@ -61,7 +69,10 @@ func main() {
 	}
 
 	scanner := scan.New(archiveDir, vlcPath, matcher, st)
-	ap := &apply.Engine{Store: st, GroupedDir: groupedDir, ArchiveDir: archiveDir, TopDir: topDir}
+	ap := &apply.Engine{Store: st, Thumbs: tm, GroupedDir: groupedDir, ArchiveDir: archiveDir, TopDir: topDir}
+
+	storageMgr := storage.NewManager(cfg)
+	storageMgr.Start(context.Background())
 
 	// VR section.
 	vrStore := vr.NewStore(st.DB())
@@ -86,6 +97,7 @@ func main() {
 		TopDir:     topDir,
 		VLCPath:    vlcPath,
 		VR:         vrSrv,
+		Storage:    storageMgr,
 	}
 
 	log.Printf("xcleanup api listening on :%s", port)

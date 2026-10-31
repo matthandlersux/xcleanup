@@ -1,0 +1,129 @@
+{
+  "patterns": {
+    "destinations": [
+      {
+        "name": "organized/backroomcastingcouch",
+        "strong": [
+          "(?i)backroom.?casting.?couch",
+          "(?i)\\bbrcc(?:\\d|[^a-z0-9]|$)",
+          "(?i)\\bbcc[\\.\\-_ ]\\d{2}[\\.\\-_]\\d{2}[\\.\\-_]\\d{2}\\b"
+        ],
+        "weak": []
+      },
+      {
+        "name": "organized/bangbros",
+        "strong": [
+          "(?i)\\bbangbros",
+          "(?i)\\bbang.?bus\\b",
+          "(?i)\\bassparade\\b",
+          "(?i)\\bbigtitsroundasses\\b",
+          "(?i)\\bbigbuttslikeitbig\\b",
+          "(?i)\\bmilfslikeitbig\\b",
+          "(?i)\\bbrownbunnies\\b",
+          "(?i)\\bbangcasting\\b",
+          "(?i)\\bbangpov\\b",
+          "(?i)\\bbigtitsatschool\\b",
+          "(?i)\\bbigtitsatwork\\b",
+          "(?i)\\bbigtitcreampies?\\b",
+          "(?i)\\bmonstersofcock\\b",
+          "(?i)\\bbigmouthfuls\\b",
+          "(?i)\\bblowjobfridays\\b",
+          "(?i)\\bmydirtymaid\\b",
+          "(?i)\\bfuckteamfive\\b",
+          "(?i)\\bmilflessons\\b",
+          "(?i)\\bmom.?is.?horny",
+          "(?i)\\bpublicbang\\b"
+        ],
+        "weak": []
+      },
+      {
+        "name": "organized/exploitedcollegegirls",
+        "strong": [
+          "(?i)exploited.?college.?girls",
+          "(?i)\\becg[\\.\\-_ ]\\d",
+          "(?i)^ecg[\\.\\-_ ]"
+        ],
+        "weak": []
+      },
+      {
+        "name": "organized/mrluckypov",
+        "strong": [
+          "(?i)\\bmrlucky(pov|raw|vip|life)?\\b",
+          "(?i)\\[mrlucky"
+        ],
+        "weak": []
+      },
+      {
+        "name": "organized/netvideogirls",
+        "strong": [
+          "(?i)netvideogirls",
+          "(?i)(?:^|[^a-z0-9])nvg(?:[^a-z0-9]|$)",
+          "(?i)\\bnetgirls?\\b",
+          "(?i)\\bcastingcouch.?hd\\b",
+          "(?i)^\\d{3,4}(-[a-z]+)+-(720p|1080p|hd|4k)(\\.|$)"
+        ],
+        "weak": []
+      },
+      {
+        "name": "vr",
+        "strong": [
+          "(?i)180_180x180",
+          "(?i)180x180_3d[hv]",
+          "(?i)_3dh_lr\\b",
+          "(?i)\\b3dv\\b",
+          "(?i)\\boculus\\b",
+          "(?i)oculusrift",
+          "(?i)czechvr",
+          "(?i)wankzvr",
+          "(?i)badoinkvr",
+          "(?i)brazzersvr",
+          "(?i)vrhard",
+          "(?i)vrspy",
+          "(?i)vrhush",
+          "(?i)virtualreal",
+          "(?i)sexlikereal",
+          "(?i)\\bslr[_\\-]",
+          "(?i)lethalhardcorevr",
+          "(?i)blusherotica",
+          "(?i)fuckpassvr",
+          "(?i)\\bbabevr\\b",
+          "(?i)jackandjillvr",
+          "(?i)vrsexperts",
+          "(?i)\\b18vr\\b",
+          "(?i)\\bpsvr\\b",
+          "(?i)\\bvr180\\b",
+          "(?i)_8k_(lr|180|fisheye)",
+          "(?i)fisheye190",
+          "(?i)\\b(5k|6k|7k|8k)_180\\b",
+          "(?i)tmwvrnet",
+          "(?i)dezyred",
+          "(?i)brasilvr",
+          "(?i)deepinsex",
+          "(?i)dirtywivesclub.*-6k",
+          "(?i)immersex",
+          "(?i)\\bpsex\\b"
+        ],
+        "weak": []
+      }
+    ]
+  },
+  "storage": {
+    "refresh_interval_seconds": 3600,
+    "drives": [
+      { "label": "krumbus", "path": "/mnt/krumbus", "highlight": true },
+      { "label": "gimble", "path": "/media/handler/gimble" },
+      { "label": "d333672d", "path": "/media/handler/d333672d-4e11-3ff2-80cf-61bfc06527ff" }
+    ],
+    "breakdowns": [
+      {
+        "drive": "krumbus",
+        "groups": [
+          { "label": "archive", "path": "archive" },
+          { "label": "grouped/vr", "path": "grouped/vr" },
+          { "label": "grouped (other)", "path": "grouped", "exclude": ["vr"] },
+          { "label": "top", "path": "top" }
+        ]
+      }
+    ]
+  }
+}

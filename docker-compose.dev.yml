@@ -4,7 +4,9 @@ services:
   app:
     build: .
     ports:
-      - "3002:3002"
+      # This machine only — never 0.0.0.0 or the LAN IP (Docker bypasses UFW). The phone reaches it through
+      # Tailscale: `tailscale serve --bg 3002` (tailnet devices only, HTTPS on the machine's ts.net name).
+      - "127.0.0.1:3002:3002"
     volumes:
       - ./:/app
       - /app/backend/tmp

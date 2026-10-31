@@ -155,6 +155,44 @@
   overflow: hidden;
   border: 1px solid #1a3a5c;
   transition: border-color 0.2s;
+  position: relative;
+}
+.vr-root .video-card .top-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #000;
+  border: 1px solid #fff;
+  color: #f5a524;
+  font-size: 22px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Shifts the ★ glyph up ~2px so it sits at the optical center of the
+     circle; the unicode star has visual weight below its content-box midline. */
+  padding-bottom: 3px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+  pointer-events: none;
+}
+.vr-root .video-card .folder-row { margin-bottom: 6px; }
+.vr-root .video-card .tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.vr-root .video-card .tags span {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.06);
+  color: #aaa;
+  white-space: nowrap;
 }.vr-root .video-card:hover{ border-color: #2980b9; }.vr-root .video-card.card-working{ border-color: #e67e22; }.vr-root .video-card .thumbs{
   height: 180px;
   overflow: hidden;
@@ -338,7 +376,31 @@
   display: flex;
   gap: 8px;
   justify-content: flex-end;
-}.vr-root /* Move history picks */
+}
+.vr-root .settings-btn{
+  background: transparent;
+  border: 1px solid #333;
+  color: #aaa;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+.vr-root .settings-btn:hover{ color: #e0e0e0; border-color: #555; }
+.vr-root .settings-modal{ min-width: 480px; max-width: 640px; }
+.vr-root .settings-section{ margin-bottom: 18px; }
+.vr-root .settings-section h4{ margin: 0 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #aaa; }
+.vr-root .settings-help{ font-size: 12px; color: #888; margin-bottom: 10px; }
+.vr-root .settings-empty{ font-size: 12px; color: #777; font-style: italic; }
+.vr-root .history-list{ list-style: none; padding: 0; margin: 0; max-height: 320px; overflow-y: auto; border: 1px solid #2a3a5a; border-radius: 6px; }
+.vr-root .history-list li{ display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid #1f2a44; }
+.vr-root .history-list li:last-child{ border-bottom: none; }
+.vr-root .history-path{ flex: 1; font-size: 12px; color: #c0c4cc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.vr-root .history-remove{ background: transparent; border: 1px solid #5a3030; color: #cc8888; border-radius: 4px; padding: 2px 9px; cursor: pointer; font-size: 14px; line-height: 1; }
+.vr-root .history-remove:hover:not(:disabled){ background: #5a3030; color: #fff; }
+.vr-root .history-remove:disabled{ opacity: 0.5; cursor: wait; }
+.vr-root /* Move history picks */
 .move-history-picks{
   display: flex;
   flex-wrap: wrap;

@@ -15,6 +15,7 @@ import (
 	"xcleanup/internal/apply"
 	"xcleanup/internal/patterns"
 	"xcleanup/internal/scan"
+	"xcleanup/internal/storage"
 	"xcleanup/internal/store"
 	"xcleanup/internal/thumbs"
 	"xcleanup/internal/vr"
@@ -43,6 +44,7 @@ type Server struct {
 	TopDir     string
 	VLCPath    string
 	VR         *vr.Server
+	Storage    *storage.Manager
 
 	scanMu     sync.Mutex
 	scanRun    bool
@@ -51,6 +53,9 @@ type Server struct {
 	applyMu       sync.Mutex
 	applyRun      bool
 	applyProgress atomic.Pointer[ApplyProgress]
+
+	groupedMu    sync.Mutex
+	groupedCache atomic.Pointer[groupedSnapshot]
 }
 
 func (s *Server) Routes() http.Handler {
@@ -82,6 +87,21 @@ func (s *Server) Routes() http.Handler {
 
 	r.Get("/api/thumb/{id}.jpg", s.thumb)
 	r.Get("/api/thumb/{id}/{idx}.jpg", s.thumb)
+
+	r.Get("/api/storage", s.storageGet)
+	r.Post("/api/storage/refresh", s.storageRefresh)
+
+	r.Get("/api/grouped/folders", s.groupedFolders)
+	r.Get("/api/grouped/videos", s.groupedVideos)
+	r.Get("/api/grouped/thumb", s.groupedThumb)
+	r.Post("/api/grouped/action", s.groupedAction)
+	r.Post("/api/grouped/delete-video", s.groupedDeleteVideo)
+
+	r.Post("/api/thumbs/purge", s.thumbsPurge)
+
+	r.Get("/api/top/videos", s.topVideos)
+	r.Get("/api/top/thumb", s.topThumb)
+	r.Post("/api/top/decision", s.topDecision)
 
 	if s.VR != nil {
 		s.VR.Mount(r)
@@ -199,16 +219,16 @@ func (s *Server) listFiles(w http.ResponseWriter, r *http.Request) {
 }
 
 type fileJSON struct {
-	ID          int64           `json:"id"`
-	Path        string          `json:"path"`
-	Name        string          `json:"name"`
-	Size        int64           `json:"size"`
-	Mtime       int64           `json:"mtime"`
-	Status      string          `json:"status"`
-	Destination string          `json:"destination,omitempty"`
+	ID          int64            `json:"id"`
+	Path        string           `json:"path"`
+	Name        string           `json:"name"`
+	Size        int64            `json:"size"`
+	Mtime       int64            `json:"mtime"`
+	Status      string           `json:"status"`
+	Destination string           `json:"destination,omitempty"`
 	Matched     []patterns.Match `json:"matched,omitempty"`
-	Override    bool            `json:"override"`
-	Extension   string          `json:"extension,omitempty"`
+	Override    bool             `json:"override"`
+	Extension   string           `json:"extension,omitempty"`
 }
 
 func filesToJSON(in []store.FileRecord) []fileJSON {

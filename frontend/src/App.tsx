@@ -2,7 +2,10 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { SectionNav } from './components/SectionNav';
 import { Archive } from './pages/Archive';
+import { Grouped } from './pages/Grouped';
+import { TopReview } from './pages/TopReview';
 import { Vr } from './pages/Vr';
+import { Overview } from './pages/Overview';
 
 const Layout = styled.div`
   display: flex;
@@ -28,7 +31,10 @@ export function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/archive" replace />} />
           <Route path="/archive/*" element={<Archive />} />
+          <Route path="/grouped" element={<Grouped />} />
+          <Route path="/top" element={<TopReview />} />
           <Route path="/vr/*" element={<Vr />} />
+          <Route path="/overview" element={<Overview />} />
           <Route path="*" element={<Navigate to="/archive" replace />} />
         </Routes>
       </Body>

@@ -6,7 +6,7 @@ run:
 shutdown:
     docker compose -f docker-compose.dev.yml down
 
-# Restart the running container (needed after editing patterns.json, .env, .air.toml)
+# Restart the running container (needed after editing config.json, .env, .air.toml)
 restart:
     docker compose -f docker-compose.dev.yml restart app
 

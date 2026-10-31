@@ -97,6 +97,26 @@ export function TopBar() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['status'] }),
   });
 
+  // Reclaims stills left behind by deletes that predate inline cleanup.
+  const purgeThumbs = useMutation({
+    mutationFn: (dry: boolean) => api.thumbsPurge(dry),
+    onError: (err: Error) => alert(`Purge failed: ${err.message}`),
+  });
+
+  const runPurge = async () => {
+    const dry = await purgeThumbs.mutateAsync(true);
+    const mb = ((dry.orphan_bytes ?? 0) / 1024 / 1024).toFixed(1);
+    if (!dry.orphan_dirs) {
+      alert('Thumbnail cache is already clean — no orphans found.');
+      return;
+    }
+    if (!confirm(`Delete ${dry.orphan_dirs} orphaned thumbnail sets (${mb} MB)?\n\nThese have no source video left on disk.`)) {
+      return;
+    }
+    const res = await purgeThumbs.mutateAsync(false);
+    alert(`Removed ${res.removed_dirs} thumbnail sets, freed ${((res.freed_bytes ?? 0) / 1024 / 1024).toFixed(1)} MB.`);
+  };
+
   const counts = status.data?.counts ?? {};
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
@@ -136,6 +156,9 @@ export function TopBar() {
           Apply Deletes
         </Btn>
         <Btn onClick={() => setCleanupOpen(true)}>Cleanup Non-Video</Btn>
+        <Btn disabled={purgeThumbs.isPending} onClick={runPurge}>
+          {purgeThumbs.isPending ? 'Purging…' : 'Purge Thumbs'}
+        </Btn>
       </ActionRow>
 
       {applyKind && <ApplyModal bucket={applyKind} onClose={() => setApplyKind(null)} />}

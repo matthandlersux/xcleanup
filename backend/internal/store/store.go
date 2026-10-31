@@ -93,6 +93,23 @@ CREATE TABLE IF NOT EXISTS vr_settings (
     value TEXT
 );
 
+-- Folder-level verdicts for the Grouped review tab. A "keep" verdict hides
+-- the folder from the review list permanently; "delete" rows are kept as an
+-- audit trail after the folder is gone.
+CREATE TABLE IF NOT EXISTS grouped_reviews (
+    path TEXT PRIMARY KEY,
+    decision TEXT NOT NULL,
+    decided_at INTEGER NOT NULL
+);
+
+-- Per-video verdicts for the Top review tab. Same semantics: "keep" means
+-- never surface this file in the review queue again.
+CREATE TABLE IF NOT EXISTS top_reviews (
+    path TEXT PRIMARY KEY,
+    decision TEXT NOT NULL,
+    decided_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS vr_move_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     folder_path TEXT NOT NULL UNIQUE,
@@ -338,6 +355,38 @@ func (s *Store) LastScan() (*ScanRecord, error) {
 		return nil, err
 	}
 	return &r, nil
+}
+
+// SetReview records a keep/delete verdict in the given review table.
+func (s *Store) SetReview(table, path, decision string) error {
+	if table != "grouped_reviews" && table != "top_reviews" {
+		return fmt.Errorf("unknown review table %q", table)
+	}
+	_, err := s.db.Exec(`INSERT INTO `+table+` (path, decision, decided_at) VALUES (?, ?, ?)
+        ON CONFLICT(path) DO UPDATE SET decision=excluded.decision, decided_at=excluded.decided_at`,
+		path, decision, time.Now().Unix())
+	return err
+}
+
+// ReviewedPaths returns the set of paths carrying the given decision.
+func (s *Store) ReviewedPaths(table, decision string) (map[string]struct{}, error) {
+	if table != "grouped_reviews" && table != "top_reviews" {
+		return nil, fmt.Errorf("unknown review table %q", table)
+	}
+	rows, err := s.db.Query(`SELECT path FROM `+table+` WHERE decision=?`, decision)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]struct{}{}
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			return nil, err
+		}
+		out[p] = struct{}{}
+	}
+	return out, rows.Err()
 }
 
 func (s *Store) LogAction(op, src, dst string, ok bool, errMsg string) error {

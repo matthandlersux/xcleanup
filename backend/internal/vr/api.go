@@ -44,6 +44,7 @@ func (s *Server) Mount(r chi.Router) {
 	r.Post("/api/vr/videos/{id}/thumbnails", s.moreThumbs)
 
 	r.Get("/api/vr/move-history", s.moveHistory)
+	r.Delete("/api/vr/move-history", s.deleteMoveHistoryEntry)
 	r.Get("/api/vr/settings", s.getSettings)
 	r.Put("/api/vr/settings", s.putSettings)
 
@@ -167,9 +168,11 @@ func (s *Server) listVideos(w http.ResponseWriter, r *http.Request) {
 	}
 	sort := q.Get("sort")
 	order := q.Get("order")
+	search := q.Get("q")
 
 	videos, total, err := s.Store.ListVideos(ListVideosParams{
 		FolderID:  folderID,
+		Search:    search,
 		SortField: sort,
 		SortOrder: order,
 		Limit:     limit,
@@ -372,6 +375,19 @@ func (s *Server) moveHistory(w http.ResponseWriter, _ *http.Request) {
 		out = []string{}
 	}
 	writeJSON(w, 200, out)
+}
+
+func (s *Server) deleteMoveHistoryEntry(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		writeErr(w, 400, "path query param required")
+		return
+	}
+	if err := s.Store.DeleteMoveHistoryEntry(path); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 
 func (s *Server) getSettings(w http.ResponseWriter, _ *http.Request) {

@@ -1,29 +1,34 @@
+import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import styled from 'styled-components';
 import { api, FileRecord } from '../api/client';
-import { Carousel } from '../components/Carousel';
+import { Carousel, FRAME_COUNT } from '../components/Carousel';
+import { Lightbox } from '../components/Lightbox';
 
 const TopBtn = styled.button`
   background: var(--accent);
   color: #0e1014;
   font-weight: 700;
   border: none;
+  padding: 4px 10px;
 `;
 
-const Wrap = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+const Grid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  padding: 14px;
+  align-items: start;
 `;
 
 const Card = styled.div<{ $status: string }>`
-  display: grid;
-  grid-template-columns: 320px minmax(0, 1fr) auto;
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   background: var(--bg-elev);
   border: 1px solid var(--border);
-  border-left: 4px solid
+  border-top: 3px solid
     ${(p) =>
       p.$status === 'move'
         ? 'var(--good)'
@@ -36,26 +41,21 @@ const Card = styled.div<{ $status: string }>`
         : 'var(--fg-dim)'};
   border-radius: 8px;
   padding: 10px;
-  align-items: start;
-  max-width: 100%;
-  overflow: hidden;
-`;
-
-const Middle = styled.div`
   min-width: 0;
   overflow: hidden;
 `;
 
 const Title = styled.div`
   font-weight: 600;
+  font-size: 13px;
+  line-height: 1.3;
   word-break: break-word;
   overflow-wrap: anywhere;
 `;
 
 const Sub = styled.div`
   color: var(--fg-dim);
-  font-size: 12px;
-  margin-top: 4px;
+  font-size: 11px;
   word-break: break-word;
   overflow-wrap: anywhere;
 `;
@@ -64,14 +64,13 @@ const Chips = styled.div`
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-top: 8px;
 `;
 
 const Chip = styled.span<{ $kind?: 'strong' | 'weak' }>`
   display: inline-block;
-  padding: 2px 8px;
+  padding: 1px 7px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 10px;
   font-family: ui-monospace, SFMono-Regular, monospace;
   background: ${(p) => (p.$kind === 'weak' ? 'var(--warn)' : 'var(--bg-row-hover)')};
   color: ${(p) => (p.$kind === 'weak' ? '#0e1014' : 'var(--fg)')};
@@ -80,9 +79,17 @@ const Chip = styled.span<{ $kind?: 'strong' | 'weak' }>`
 
 const Actions = styled.div`
   display: flex;
-  flex-direction: column;
   gap: 6px;
-  align-items: stretch;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: auto;
+
+  select {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    padding: 3px 6px;
+  }
 `;
 
 function fmtSize(n: number) {
@@ -109,6 +116,9 @@ export function FileList() {
   });
   const dests = useQuery({ queryKey: ['destinations'], queryFn: api.destinations });
 
+  // Lightbox state: which file (by list position) and which frame.
+  const [view, setView] = useState<{ pos: number; frame: number } | null>(null);
+
   const update = useMutation({
     mutationFn: ({ id, body }: { id: number; body: { status: string; destination?: string } }) =>
       api.updateFile(id, body),
@@ -128,31 +138,51 @@ export function FileList() {
     },
   });
 
-  if (files.isLoading) return <div>Loading…</div>;
-  if (files.error) return <div>Error: {String(files.error)}</div>;
+  if (files.isLoading) return <div style={{ padding: 14 }}>Loading…</div>;
+  if (files.error) return <div style={{ padding: 14 }}>Error: {String(files.error)}</div>;
   const list = files.data?.files ?? [];
 
   if (list.length === 0) {
     return (
-      <div style={{ color: 'var(--fg-dim)' }}>
+      <div style={{ color: 'var(--fg-dim)', padding: 14 }}>
         No files in this bucket yet. Run <strong>Scan Now</strong>.
       </div>
     );
   }
 
+  const current = view ? list[view.pos] : null;
+
   return (
-    <Wrap>
-      {list.map((f) => (
-        <Row
-          key={f.id}
-          file={f}
-          destinations={dests.data?.destinations ?? []}
-          onChange={(body) => update.mutate({ id: f.id, body })}
-          onMoveTop={() => moveTop.mutate(f.id)}
-          moveTopBusy={moveTop.isPending && moveTop.variables === f.id}
+    <>
+      <Grid>
+        {list.map((f, i) => (
+          <Row
+            key={f.id}
+            file={f}
+            destinations={dests.data?.destinations ?? []}
+            onChange={(body) => update.mutate({ id: f.id, body })}
+            onMoveTop={() => moveTop.mutate(f.id)}
+            moveTopBusy={moveTop.isPending && moveTop.variables === f.id}
+            onOpen={(frame) => setView({ pos: i, frame })}
+          />
+        ))}
+      </Grid>
+
+      {current && view && (
+        <Lightbox
+          title={current.name}
+          subtitle={`${fmtSize(current.size)} · ${fmtDate(current.mtime)} · ${current.path}`}
+          position={`${view.pos + 1} / ${list.length}`}
+          frameCount={FRAME_COUNT}
+          frameIdx={view.frame}
+          frameSrc={(idx) => `/api/thumb/${current.id}/${idx}.jpg`}
+          onFrame={(frame) => setView({ ...view, frame })}
+          onPrevItem={() => setView({ pos: (view.pos - 1 + list.length) % list.length, frame: 0 })}
+          onNextItem={() => setView({ pos: (view.pos + 1) % list.length, frame: 0 })}
+          onClose={() => setView(null)}
         />
-      ))}
-    </Wrap>
+      )}
+    </>
   );
 }
 
@@ -162,39 +192,42 @@ function Row({
   onChange,
   onMoveTop,
   moveTopBusy,
+  onOpen,
 }: {
   file: FileRecord;
   destinations: string[];
   onChange: (body: { status: string; destination?: string }) => void;
   onMoveTop: () => void;
   moveTopBusy: boolean;
+  onOpen: (frame: number) => void;
 }) {
   return (
     <Card $status={file.status}>
-      <Carousel id={file.id} />
-      <Middle>
-        <Title>{file.name}</Title>
+      <Carousel id={file.id} onOpen={onOpen} />
+      <Title title={file.name}>{file.name}</Title>
+      <Sub>
+        {fmtSize(file.size)} · {fmtDate(file.mtime)}
+      </Sub>
+      <Sub>
+        <code>{file.path}</code>
+      </Sub>
+      {file.matched && file.matched.length > 0 && (
+        <Chips>
+          {file.matched.map((m, i) => (
+            <Chip key={i} $kind={m.kind} title={m.pattern}>
+              {m.destination} · {m.kind}
+            </Chip>
+          ))}
+        </Chips>
+      )}
+      {file.destination && (
         <Sub>
-          {fmtSize(file.size)} · {fmtDate(file.mtime)} · <code>{file.path}</code>
+          <strong style={{ color: 'var(--good)' }}>→ {file.destination}</strong>
         </Sub>
-        {file.matched && file.matched.length > 0 && (
-          <Chips>
-            {file.matched.map((m, i) => (
-              <Chip key={i} $kind={m.kind} title={m.pattern}>
-                {m.destination} · {m.kind}
-              </Chip>
-            ))}
-          </Chips>
-        )}
-        {file.destination && (
-          <Sub>
-            <strong style={{ color: 'var(--good)' }}>→ {file.destination}</strong>
-          </Sub>
-        )}
-      </Middle>
+      )}
       <Actions>
         <TopBtn onClick={onMoveTop} disabled={moveTopBusy} title="Move to /mnt/krumbus/top">
-          {moveTopBusy ? 'Moving…' : '↑ Top'}
+          {moveTopBusy ? '…' : '↑ Top'}
         </TopBtn>
         <select
           value={file.status}

@@ -72,8 +72,13 @@ export default function VideoCard({ video, folderPath, moveHistory, isProbing, i
   const hasAnyThumb = video.thumbs.length > 0;
   const isWorking = isProbing || isThumbing;
 
+  const isProtected = video.path.includes('/top/');
+
   return (
     <div className={`video-card ${isWorking ? 'card-working' : ''}`}>
+      {isProtected && (
+        <div className="top-badge" title="In a /top/ folder — protected">★</div>
+      )}
       <div className="thumbs">
         {hasAnyThumb ? (
           <>
@@ -112,22 +117,23 @@ export default function VideoCard({ video, folderPath, moveHistory, isProbing, i
         )}
       </div>
       <div className="info">
-        <div className="filename">
-          {video.path.includes('/top/') && <span className="top-star" title="In a /top/ folder — protected">★</span>}
-          {video.filename}
-        </div>
-        <div className="meta">
+        {parentFolder && (
+          <div className="tags folder-row">
+            <span className="parent-folder" title={video.path}>{parentFolder}</span>
+          </div>
+        )}
+        <div className="filename">{video.filename}</div>
+        <div className="tags">
           {video.duration_secs ? <span>{formatDuration(video.duration_secs)}</span> : isProbing ? <span className="meta-pending">probing...</span> : null}
           {video.width && video.height && <span>{video.width}x{video.height}</span>}
           {video.size_bytes && <span>{formatSize(video.size_bytes)}</span>}
           {video.codec && <span>{video.codec}</span>}
           {video.created_at && <span>{formatDate(video.created_at)}</span>}
-          {parentFolder && <span className="parent-folder">{parentFolder}</span>}
         </div>
         <div className="actions">
           <button onClick={() => openModal('rename')}>Rename</button>
           <button onClick={() => openModal('move')}>Move</button>
-          {!video.path.includes('/top/') && (
+          {!isProtected && (
             <button className="danger" onClick={() => openModal('delete')}>Delete</button>
           )}
         </div>

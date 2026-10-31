@@ -1,21 +1,15 @@
 package patterns
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 )
 
-type rawDestination struct {
-	Name   string   `json:"name"`
-	Strong []string `json:"strong"`
-	Weak   []string `json:"weak"`
-}
-
-type rawConfig struct {
-	Destinations []rawDestination `json:"destinations"`
+type RawDestination struct {
+	Name   string   `json:"name" mapstructure:"name"`
+	Strong []string `json:"strong" mapstructure:"strong"`
+	Weak   []string `json:"weak" mapstructure:"weak"`
 }
 
 type Destination struct {
@@ -34,17 +28,9 @@ type Matcher struct {
 	Destinations []Destination
 }
 
-func Load(path string) (*Matcher, error) {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read patterns: %w", err)
-	}
-	var cfg rawConfig
-	if err := json.Unmarshal(b, &cfg); err != nil {
-		return nil, fmt.Errorf("parse patterns: %w", err)
-	}
+func New(raw []RawDestination) (*Matcher, error) {
 	m := &Matcher{}
-	for _, rd := range cfg.Destinations {
+	for _, rd := range raw {
 		d := Destination{Name: rd.Name}
 		for _, s := range rd.Strong {
 			re, err := regexp.Compile(s)
