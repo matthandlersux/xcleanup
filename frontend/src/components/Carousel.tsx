@@ -85,8 +85,16 @@ const Dot = styled.button<{ $active: boolean }>`
   }
 `;
 
-export function Carousel({ id, onOpen }: { id: number; onOpen?: (idx: number) => void }) {
-  const [idx, setIdx] = useState(0);
+export function Carousel({
+  id,
+  onOpen,
+  initialFrame = 0,
+}: {
+  id: number;
+  onOpen?: (idx: number) => void;
+  initialFrame?: number;
+}) {
+  const [idx, setIdx] = useState(initialFrame);
   const step = (delta: number) => setIdx((prev) => (prev + delta + FRAME_COUNT) % FRAME_COUNT);
   return (
     <Wrap onClick={() => onOpen?.(idx)} title={onOpen ? 'Click to enlarge' : undefined}>

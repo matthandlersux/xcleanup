@@ -200,6 +200,10 @@ export function FileList() {
   }
 
   const current = view ? list[view.pos] : null;
+  // Auto-moves open on the second frame: for common studios the first is the same intro card on every
+  // video, and here Matt is picking out videos he doesn't want. Auto-deletes keep the first (the studio
+  // card is the best sign of a video he'd want to save).
+  const startFrame = status === 'move' ? 1 : 0;
 
   return (
     <>
@@ -213,6 +217,7 @@ export function FileList() {
             onMoveTop={() => moveTop.mutate(f.id)}
             moveTopBusy={moveTop.isPending && moveTop.variables === f.id}
             onOpen={(frame) => setView({ pos: i, frame })}
+            startFrame={startFrame}
           />
         ))}
       </Grid>
@@ -226,8 +231,8 @@ export function FileList() {
           frameIdx={view.frame}
           frameSrc={(idx) => `/api/thumb/${current.id}/${idx}.jpg`}
           onFrame={(frame) => setView({ ...view, frame })}
-          onPrevItem={() => setView({ pos: (view.pos - 1 + list.length) % list.length, frame: 0 })}
-          onNextItem={() => setView({ pos: (view.pos + 1) % list.length, frame: 0 })}
+          onPrevItem={() => setView({ pos: (view.pos - 1 + list.length) % list.length, frame: startFrame })}
+          onNextItem={() => setView({ pos: (view.pos + 1) % list.length, frame: startFrame })}
           onClose={() => setView(null)}
         />
       )}
@@ -242,6 +247,7 @@ function Row({
   onMoveTop,
   moveTopBusy,
   onOpen,
+  startFrame,
 }: {
   file: FileRecord;
   destinations: string[];
@@ -249,10 +255,11 @@ function Row({
   onMoveTop: () => void;
   moveTopBusy: boolean;
   onOpen: (frame: number) => void;
+  startFrame: number;
 }) {
   return (
     <Card $status={file.status}>
-      <Carousel id={file.id} onOpen={onOpen} />
+      <Carousel id={file.id} onOpen={onOpen} initialFrame={startFrame} />
       <Title title={file.name}>{file.name}</Title>
       <Sub>
         {fmtSize(file.size)} · {fmtDate(file.mtime)}
