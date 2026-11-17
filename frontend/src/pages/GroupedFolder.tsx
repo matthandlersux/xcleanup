@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import styled from 'styled-components';
 import { api, GroupedFolderDetail, GroupedVideo } from '../api/client';
 import { Lightbox } from '../components/Lightbox';
+import { phone } from '../styles/global';
 
 /** Frames offered per video in the drill-in lightbox. */
 const LIGHTBOX_FRAMES = 5;
@@ -17,6 +18,15 @@ const Bar = styled.header`
   position: sticky;
   top: 0;
   z-index: 5;
+
+  ${phone} {
+    gap: 12px;
+    padding: 8px 12px;
+    button {
+      min-height: 44px;
+      flex-shrink: 0;
+    }
+  }
 `;
 
 const Heading = styled.div`
@@ -34,6 +44,10 @@ const Name = styled.div`
 const Sub = styled.div`
   color: var(--fg-dim);
   font-size: 12px;
+
+  ${phone} {
+    font-size: 13px;
+  }
 `;
 
 const Grid = styled.div`
@@ -41,6 +55,11 @@ const Grid = styled.div`
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 12px;
   padding: 14px;
+
+  ${phone} {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 12px;
+  }
 `;
 
 const Tile = styled.div<{ $gone: boolean }>`
@@ -81,6 +100,10 @@ const FileName = styled.div`
   line-height: 1.3;
   word-break: break-word;
   overflow-wrap: anywhere;
+
+  ${phone} {
+    font-size: 14px;
+  }
 `;
 
 const KillBtn = styled.button`
@@ -90,6 +113,10 @@ const KillBtn = styled.button`
   border: none;
   margin-top: auto;
   padding: 4px 10px;
+
+  ${phone} {
+    min-height: 44px;
+  }
 `;
 
 function fmtSize(n: number) {

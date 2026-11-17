@@ -2,10 +2,12 @@ import { NavLink } from 'react-router-dom';
 import styled from 'styled-components';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ApplyModal } from './ApplyModal';
 import { CleanupModal } from './CleanupModal';
 import { DiskBar } from './DiskBar';
+import { useCenterActive } from '../hooks/useCenterActive';
+import { phone } from '../styles/global';
 
 const Bar = styled.header`
   display: flex;
@@ -14,6 +16,10 @@ const Bar = styled.header`
   padding: 12px 20px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-elev);
+
+  ${phone} {
+    padding: 8px 12px 12px;
+  }
 `;
 
 const Row = styled.div`
@@ -21,10 +27,25 @@ const Row = styled.div`
   align-items: center;
   gap: 16px;
   min-width: 0;
+
+  /* Phone: tabs get their own full-width row; disk bar + meta share the next. */
+  ${phone} {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
 `;
 
 const ActionRow = styled(Row)`
   justify-content: flex-end;
+
+  /* Phone: buttons wrap into full-width rows (3 + 2) with 44px tap targets. */
+  ${phone} {
+    gap: 8px;
+    button {
+      flex: 1 1 auto;
+      min-height: 44px;
+    }
+  }
 `;
 
 const Tabs = styled.nav`
@@ -45,11 +66,40 @@ const Tabs = styled.nav`
     background: var(--bg-row);
     border-color: var(--border);
   }
+
+  /* Phone: one swipeable row of tabs, bleeding to the screen edges. */
+  ${phone} {
+    position: relative;
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin: 0 -12px;
+    padding: 0 12px;
+    &::-webkit-scrollbar {
+      display: none;
+    }
+    a {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      min-height: 40px;
+      padding: 0 12px;
+      font-size: 15px;
+    }
+    a:hover {
+      text-decoration: none;
+    }
+  }
 `;
 
 const Spacer = styled.div`
   flex: 1;
   min-width: 0;
+
+  ${phone} {
+    display: none;
+  }
 `;
 
 const Meta = styled.div`
@@ -60,6 +110,13 @@ const Meta = styled.div`
   line-height: 1.4;
   text-align: right;
   flex-shrink: 0;
+
+  ${phone} {
+    flex-shrink: 1;
+    min-width: 0;
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
 `;
 
 const Btn = styled.button<{ $variant?: 'primary' | 'warn' | 'danger' }>`
@@ -91,6 +148,8 @@ export function TopBar() {
   const scanProgress = status.data?.scan_progress;
   const [applyKind, setApplyKind] = useState<null | 'auto_moves' | 'auto_deletes'>(null);
   const [cleanupOpen, setCleanupOpen] = useState(false);
+  const tabsRef = useRef<HTMLElement>(null);
+  useCenterActive(tabsRef);
 
   const startScan = useMutation({
     mutationFn: api.startScan,
@@ -123,7 +182,7 @@ export function TopBar() {
   return (
     <Bar>
       <Row>
-        <Tabs>
+        <Tabs ref={tabsRef}>
           {tabs.map((t) => {
             const c = t.key === 'all' ? total : counts[t.key] ?? 0;
             return (

@@ -51,3 +51,8 @@ export const GlobalStyles = createGlobalStyle`
   a { color: var(--accent); text-decoration: none; }
   a:hover { text-decoration: underline; }
 `;
+
+/** Phone-width breakpoint. Mobile tweaks live under this; desktop stays untouched. */
+export const phone = '@media (max-width: 640px)';
+/** Touch screens (no hover), where hover-only controls must stay visible. */
+export const touch = '@media (hover: none)';

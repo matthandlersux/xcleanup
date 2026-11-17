@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import styled from 'styled-components';
 import { api, Decision, TopVideo, TopVideos } from '../api/client';
 import { Lightbox } from '../components/Lightbox';
+import { phone } from '../styles/global';
 
 const Bar = styled.header`
   display: flex;
@@ -11,12 +12,25 @@ const Bar = styled.header`
   padding: 12px 20px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-elev);
+
+  ${phone} {
+    gap: 12px;
+    padding: 10px 12px;
+    button {
+      min-height: 44px;
+      flex-shrink: 0;
+    }
+  }
 `;
 
 const Meta = styled.div`
   color: var(--fg-dim);
   font-size: 12px;
   flex: 1;
+
+  ${phone} {
+    font-size: 13px;
+  }
 `;
 
 const Grid = styled.div`
@@ -24,6 +38,11 @@ const Grid = styled.div`
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 10px;
   padding: 14px;
+
+  ${phone} {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 12px;
+  }
 `;
 
 const Tile = styled.div`
@@ -48,6 +67,11 @@ const TileName = styled.div`
   line-height: 1.3;
   word-break: break-word;
   overflow-wrap: anywhere;
+
+  ${phone} {
+    padding: 8px 10px;
+    font-size: 14px;
+  }
 `;
 
 const StartBtn = styled.button`

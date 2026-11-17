@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import styled from 'styled-components';
 import { api, Decision, GroupedFolder } from '../api/client';
 import { Lightbox } from '../components/Lightbox';
+import { phone } from '../styles/global';
 import { GroupedFolder as GroupedFolderView } from './GroupedFolder';
 
 /** Frames offered per video in the grouped lightbox. */
@@ -16,12 +17,25 @@ const Bar = styled.header`
   padding: 12px 20px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-elev);
+
+  ${phone} {
+    gap: 12px;
+    padding: 10px 12px;
+    button {
+      min-height: 44px;
+      flex-shrink: 0;
+    }
+  }
 `;
 
 const Meta = styled.div`
   color: var(--fg-dim);
   font-size: 12px;
   flex: 1;
+
+  ${phone} {
+    font-size: 13px;
+  }
 `;
 
 const List = styled.div`
@@ -29,6 +43,11 @@ const List = styled.div`
   flex-direction: column;
   gap: 14px;
   padding: 14px;
+
+  ${phone} {
+    gap: 12px;
+    padding: 12px;
+  }
 `;
 
 const Card = styled.div`
@@ -40,6 +59,12 @@ const Card = styled.div`
   border-radius: 8px;
   padding: 12px;
   min-width: 0;
+
+  /* Phone: folder info and buttons on top, the stills strip underneath. */
+  ${phone} {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
 `;
 
 const Info = styled.div`
@@ -60,6 +85,11 @@ const Name = styled.button`
   overflow-wrap: anywhere;
   cursor: pointer;
 
+  ${phone} {
+    font-size: 16px;
+    padding: 4px 0;
+  }
+
   &:hover {
     background: none;
     color: var(--accent);
@@ -70,6 +100,10 @@ const Name = styled.button`
 const Sub = styled.div`
   color: var(--fg-dim);
   font-size: 12px;
+
+  ${phone} {
+    font-size: 13px;
+  }
 `;
 
 /* Two rows of stills — the "double height" strip. */
@@ -109,12 +143,23 @@ const ShotName = styled.div`
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+
+  /* Too small to read at phone width; the lightbox shows the name. */
+  ${phone} {
+    display: none;
+  }
 `;
 
 const Actions = styled.div`
   display: flex;
   gap: 8px;
   margin-top: auto;
+
+  ${phone} {
+    button {
+      min-height: 44px;
+    }
+  }
 `;
 
 const KeepBtn = styled.button`

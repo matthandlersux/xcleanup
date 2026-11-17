@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import styled from 'styled-components';
 import { api } from '../api/client';
 import { Modal, ModalActions } from './Modal';
+import { phone } from '../styles/global';
 
 const List = styled.div`
   max-height: 50vh;
@@ -9,6 +10,12 @@ const List = styled.div`
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--bg);
+
+  ${phone} {
+    max-height: none;
+    flex: 1 1 auto;
+    min-height: 120px;
+  }
 `;
 
 const Row = styled.div`
@@ -19,6 +26,16 @@ const Row = styled.div`
   border-bottom: 1px solid var(--border);
   font-size: 12px;
   &:last-child { border-bottom: none; }
+
+  /* Phone: let long paths wrap instead of pushing the size column off-screen. */
+  ${phone} {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    padding: 8px 10px;
+    font-size: 13px;
+    code {
+      overflow-wrap: anywhere;
+    }
+  }
 `;
 
 const Kind = styled.span<{ $kind: string }>`

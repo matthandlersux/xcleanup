@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import styled from 'styled-components';
+import { touch } from '../styles/global';
 
 export const FRAME_COUNT = 3;
 
@@ -48,6 +49,13 @@ const Arrow = styled.button<{ $side: 'left' | 'right' }>`
   &:hover {
     background: rgba(0, 0, 0, 0.8);
   }
+
+  /* No hover on touch screens: keep the arrows visible and finger-sized. */
+  ${touch} {
+    opacity: 1;
+    width: 40px;
+    height: 40px;
+  }
 `;
 
 const Dots = styled.div`
@@ -69,6 +77,11 @@ const Dot = styled.button<{ $active: boolean }>`
   cursor: pointer;
   &:hover {
     background: ${(p) => (p.$active ? 'var(--accent)' : 'rgba(255, 255, 255, 0.95)')};
+  }
+
+  ${touch} {
+    width: 12px;
+    height: 12px;
   }
 `;
 

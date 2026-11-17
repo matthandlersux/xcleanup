@@ -1,16 +1,23 @@
 import styled from 'styled-components';
 import type { Disk } from '../api/client';
+import { phone } from '../styles/global';
 
 const Wrap = styled.div`
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 220px;
+
+  ${phone} {
+    flex: 1 1 180px;
+    min-width: 0;
+  }
 `;
 
 const Label = styled.div`
   display: flex;
   justify-content: space-between;
+  gap: 8px;
   font-size: 11px;
   color: var(--fg-dim);
   letter-spacing: 0.3px;

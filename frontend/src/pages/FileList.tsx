@@ -5,6 +5,7 @@ import styled from 'styled-components';
 import { api, FileRecord } from '../api/client';
 import { Carousel, FRAME_COUNT } from '../components/Carousel';
 import { Lightbox } from '../components/Lightbox';
+import { phone } from '../styles/global';
 
 const TopBtn = styled.button`
   background: var(--accent);
@@ -12,6 +13,11 @@ const TopBtn = styled.button`
   font-weight: 700;
   border: none;
   padding: 4px 10px;
+
+  ${phone} {
+    min-height: 44px;
+    padding: 0 16px;
+  }
 `;
 
 const Grid = styled.div`
@@ -20,6 +26,13 @@ const Grid = styled.div`
   gap: 14px;
   padding: 14px;
   align-items: start;
+
+  /* Phone: one card per row, so names, paths and controls get the full width. */
+  ${phone} {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    padding: 12px;
+  }
 `;
 
 const Card = styled.div<{ $status: string }>`
@@ -43,6 +56,11 @@ const Card = styled.div<{ $status: string }>`
   padding: 10px;
   min-width: 0;
   overflow: hidden;
+
+  ${phone} {
+    gap: 10px;
+    padding: 12px;
+  }
 `;
 
 const Title = styled.div`
@@ -51,6 +69,10 @@ const Title = styled.div`
   line-height: 1.3;
   word-break: break-word;
   overflow-wrap: anywhere;
+
+  ${phone} {
+    font-size: 16px;
+  }
 `;
 
 const Sub = styled.div`
@@ -58,6 +80,11 @@ const Sub = styled.div`
   font-size: 11px;
   word-break: break-word;
   overflow-wrap: anywhere;
+
+  ${phone} {
+    font-size: 13px;
+    line-height: 1.4;
+  }
 `;
 
 const Chips = styled.div`
@@ -75,6 +102,13 @@ const Chip = styled.span<{ $kind?: 'strong' | 'weak' }>`
   background: ${(p) => (p.$kind === 'weak' ? 'var(--warn)' : 'var(--bg-row-hover)')};
   color: ${(p) => (p.$kind === 'weak' ? '#0e1014' : 'var(--fg)')};
   border: 1px solid var(--border);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+
+  ${phone} {
+    font-size: 12px;
+    padding: 2px 8px;
+  }
 `;
 
 const Actions = styled.div`
@@ -89,6 +123,21 @@ const Actions = styled.div`
     min-width: 0;
     font-size: 12px;
     padding: 3px 6px;
+  }
+
+  /* Phone: 16px selects (no iOS zoom-on-focus) and 44px tap targets; the
+     destination picker drops to its own full-width line. */
+  ${phone} {
+    gap: 8px;
+    select {
+      flex: 1 1 120px;
+      min-height: 44px;
+      font-size: 16px;
+      padding: 0 8px;
+    }
+    select + select {
+      flex-basis: 100%;
+    }
   }
 `;
 

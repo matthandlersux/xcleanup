@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { api, type StorageSnapshot, type StorageDrive, type StorageBreakdown } from '../api/client';
+import { phone } from '../styles/global';
 
 const Wrap = styled.div`
   padding: 20px;
@@ -9,6 +10,11 @@ const Wrap = styled.div`
   gap: 24px;
   max-width: 1100px;
   margin: 0 auto;
+
+  ${phone} {
+    padding: 12px;
+    gap: 18px;
+  }
 `;
 
 const SectionTitle = styled.h2`
@@ -28,6 +34,10 @@ const HighlightCard = styled.section<{ $pct: number }>`
   display: flex;
   flex-direction: column;
   gap: 14px;
+
+  ${phone} {
+    padding: 16px;
+  }
 `;
 
 const HighlightHead = styled.div`
@@ -35,6 +45,11 @@ const HighlightHead = styled.div`
   justify-content: space-between;
   align-items: baseline;
   gap: 16px;
+
+  ${phone} {
+    gap: 8px;
+    min-width: 0;
+  }
 `;
 
 const HighlightLabel = styled.div`
@@ -50,6 +65,10 @@ const HighlightFree = styled.div<{ $bad: boolean; $warn: boolean }>`
   font-weight: 700;
   letter-spacing: -0.5px;
   color: ${(p) => (p.$bad ? 'var(--bad)' : p.$warn ? 'var(--warn)' : 'var(--good)')};
+
+  ${phone} {
+    font-size: 34px;
+  }
 `;
 
 const HighlightFooter = styled.div`
@@ -101,6 +120,10 @@ const Grid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 12px;
+
+  ${phone} {
+    grid-template-columns: minmax(0, 1fr);
+  }
 `;
 
 const DriveCard = styled.div`
@@ -148,6 +171,10 @@ const Breakdown = styled.section`
   display: flex;
   flex-direction: column;
   gap: 14px;
+
+  ${phone} {
+    padding: 16px;
+  }
 `;
 
 const BreakdownBody = styled.div`
@@ -157,6 +184,14 @@ const BreakdownBody = styled.div`
   align-items: center;
   @media (max-width: 720px) {
     grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 20px;
+    & > * {
+      justify-self: stretch;
+    }
+    & > svg {
+      justify-self: center;
+    }
   }
 `;
 
@@ -181,6 +216,11 @@ const BreakdownRow = styled.div`
   grid-template-columns: 160px 1fr 90px;
   gap: 12px;
   align-items: center;
+
+  ${phone} {
+    grid-template-columns: minmax(0, 1fr) 70px auto;
+    gap: 10px;
+  }
 `;
 
 const BreakdownBar = styled.div`
@@ -204,6 +244,11 @@ const SLICE_COLORS = ['#5b9eff', '#f5a524', '#a78bfa', '#4ade80', '#ef5a5a', '#2
 const BreakdownLabel = styled.div`
   font-size: 13px;
   font-weight: 600;
+
+  ${phone} {
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
 `;
 
 const BreakdownSize = styled.div`
@@ -220,6 +265,14 @@ const RefreshBar = styled.div`
   gap: 12px;
   color: var(--fg-dim);
   font-size: 12px;
+
+  ${phone} {
+    font-size: 13px;
+    button {
+      min-height: 40px;
+      flex-shrink: 0;
+    }
+  }
 `;
 
 const Empty = styled.div`

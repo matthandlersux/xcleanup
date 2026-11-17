@@ -11,6 +11,8 @@ const Layout = styled.div`
   display: flex;
   flex-direction: column;
   height: 100vh;
+  /* Mobile browsers: the visible height, excluding the URL bar. */
+  height: 100dvh;
   width: 100vw;
   overflow: hidden;
 `;
